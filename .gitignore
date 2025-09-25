@@ -67,3 +67,13 @@ temp_images/
 
 # Generated catalogs (if storing locally)
 generated_catalogs/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Python virtual environments
+pyvenv.cfg
