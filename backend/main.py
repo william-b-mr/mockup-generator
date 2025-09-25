@@ -13,6 +13,11 @@ import uuid
 
 app = FastAPI(title="Catalog Generator API")
 
+## Next steps:
+## 1. Implement the Gemini API calls to overlay logos on templates.
+## 2. Add logic to save generated images back to Supabase storage.
+## 3. Add logic to fetch the correct mockup templates based on user selection.
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
