@@ -36,28 +36,25 @@ class CatalogService:
                 'customer_name': request.customer_name,
                 'industry': request.industry,
                 'status': JobStatus.PENDING.value,
-                'created_at': datetime.utcnow().isoformat(),
-                'updated_at': datetime.utcnow().isoformat(),
                 'metadata': {
                     'items': request.items,
                     'colors': request.colors,
                     'total_pages': len(request.items) * len(request.colors)
                 }
             }
-            await self.supabase.create_job(job_data)
+            await self.db.create_job(job_data)
             
             # 2. Upload logo to Supabase Storage
             logo_url = await self._upload_logo(job_id, request.logo)
             
             # 3. Update job status to processing
-            await self.supabase.update_job_status(
+            await self.db.update_job_status(
                 job_id, 
                 JobStatus.PROCESSING.value,
                 progress=10
             )
             
-            # 4. Trigger background processing (in production, use Celery/background tasks)
-            # For now, we'll do it synchronously, but this should be async
+            # 4. Process catalog generation
             await self._process_catalog_generation(
                 job_id, 
                 request, 
@@ -75,7 +72,7 @@ class CatalogService:
             
         except Exception as e:
             logger.error(f"Error creating catalog for job {job_id}: {e}")
-            await self.supabase.update_job_status(
+            await self.db.update_job_status(
                 job_id,
                 JobStatus.FAILED.value,
                 error_message=str(e)
@@ -86,14 +83,14 @@ class CatalogService:
         """Upload logo to Supabase Storage"""
         try:
             # Decode base64 logo
-            if ',' in logo_data:  # Handle data:image/png;base64,... format
+            if ',' in logo_data:
                 logo_data = logo_data.split(',')[1]
             
             logo_bytes = base64.b64decode(logo_data)
             
-            # Upload to Supabase
+            # Upload to Supabase Storage
             file_path = f"logos/{job_id}/original.png"
-            logo_url = await self.supabase.upload_file(
+            logo_url = await self.storage.upload_file(
                 file_path,
                 logo_bytes,
                 content_type='image/png'
@@ -105,6 +102,22 @@ class CatalogService:
         except Exception as e:
             logger.error(f"Error uploading logo: {e}")
             raise LogoProcessingException(detail=str(e))
+    
+    async def _validate_templates(self, items: List[str], colors: List[str]):
+        """Validate that all required templates exist"""
+        missing_templates = []
+        
+        for item in items:
+            for color in colors:
+                template = await self.db.get_template(item, color)
+                if not template:
+                    missing_templates.append(f"{item} - {color}")
+        
+        if missing_templates:
+            raise TemplateNotFoundException(
+                item=missing_templates[0].split(' - ')[0],
+                color=missing_templates[0].split(' - ')[1]
+            )
     
     async def _process_catalog_generation(
         self, 
@@ -200,30 +213,14 @@ class CatalogService:
             )
             raise
     
-    async def _validate_templates(self, items: List[str], colors: List[str]):
-        """Validate that all required templates exist"""
-        missing_templates = []
-        
-        for item in items:
-            for color in colors:
-                template = await self.supabase.get_template(item, color)
-                if not template:
-                    missing_templates.append(f"{item} - {color}")
-        
-        if missing_templates:
-            raise TemplateNotFoundException(
-                item=missing_templates[0].split(' - ')[0],
-                color=missing_templates[0].split(' - ')[1]
-            )
-    
     def _estimate_processing_time(self, total_pages: int) -> int:
         """Estimate processing time in seconds"""
         # Rough estimate: 10 seconds per page + 30 seconds overhead
         return (total_pages * 10) + 30
     
-    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+async def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get job status from database"""
-        job = await self.supabase.get_job(job_id)
+        job = await self.db.get_job(job_id)
         if not job:
             raise Exception(f"Job {job_id} not found")
         return job

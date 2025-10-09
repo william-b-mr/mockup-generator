@@ -5,6 +5,7 @@ import logging
 
 from app.api.routes import catalog, jobs, templates, health
 from app.core.config import settings
+from app.core.database import db
 from app.core.exceptions import CatalogException
 
 # Configure logging
@@ -47,9 +48,20 @@ app.include_router(templates.router, prefix="/api/templates", tags=["Templates"]
 
 @app.on_event("startup")
 async def startup_event():
+    """Initialize database connection pool on startup"""
     logger.info("Starting Catalog Generator API...")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
+    
+    try:
+        await db.connect()
+        logger.info("Database connection pool initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    """Close database connection pool on shutdown"""
     logger.info("Shutting down Catalog Generator API...")
+    await db.disconnect()
+    logger.info("Database connection pool closed")

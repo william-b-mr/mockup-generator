@@ -2,7 +2,15 @@ from pydantic import BaseSettings
 from typing import List
 
 class Settings(BaseSettings):
-    # Supabase
+    # Database (Direct PostgreSQL Connection)
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_HOST: str
+    DB_PORT: int = 6543
+    DB_NAME: str
+    
+    
+    # Supabase Storage (for file uploads only)
     SUPABASE_URL: str
     SUPABASE_KEY: str
     SUPABASE_SERVICE_KEY: str
@@ -29,6 +37,13 @@ class Settings(BaseSettings):
     # Job Settings
     JOB_TIMEOUT_SECONDS: int = 300
     MAX_RETRIES: int = 3
+    
+    @property
+    def database_url(self) -> str:
+        """Construct database URL if not provided"""
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
     
     class Config:
         env_file = ".env"
