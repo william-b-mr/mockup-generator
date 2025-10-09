@@ -242,7 +242,7 @@ function App() {
                 required
               >
                 <option value="">Selecione uma indústria</option>
-                {industries.map(industry => (
+                {industries && industries.map(industry => (
                   <option key={industry} value={industry}>{industry}</option>
                 ))}
               </select>
@@ -254,7 +254,7 @@ function App() {
             <div className="form-group">
               <label>Selecionar Items:</label>
               <div className="items-grid">
-                {templates.map(template => (
+                {templates && templates.map(template => (
                   <div key={template.id} className="item-card">
                     <input
                       type="checkbox"
@@ -287,7 +287,7 @@ function App() {
           <div className="generated-catalog">
             <h2>Catálogo Gerado</h2>
             <div className="catalog-grid">
-              {generatedCatalog.map((item, index) => (
+              {generatedCatalog && generatedCatalog.map((item, index) => (
                 <div key={index} className="catalog-item">
                   <img src={item.generated_image} alt={item.item} />
                   <h3>{item.item}</h3>
