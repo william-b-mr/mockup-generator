@@ -4,8 +4,10 @@ python-multipart==0.0.6
 supabase==2.0.3
 python-dotenv==1.0.0
 pydantic==2.5.0
-httpx==0.25.1
+httpx==0.24.0
 pillow==10.1.0
 aiofiles==23.2.1
 python-jose[cryptography]==3.3.0
 redis==5.0.1
+asyncpg==0.29.0
+storage3==0.6.0
