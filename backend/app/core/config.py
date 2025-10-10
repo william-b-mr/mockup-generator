@@ -1,8 +1,10 @@
-from pydantic import BaseSettings
-from typing import List
+from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
+from typing import List, Optional
 
 class Settings(BaseSettings):
     # Database (Direct PostgreSQL Connection)
+    DATABASE_URL: Optional[str] = None
     DB_USER: str
     DB_PASSWORD: str
     DB_HOST: str
@@ -38,6 +40,9 @@ class Settings(BaseSettings):
     JOB_TIMEOUT_SECONDS: int = 300
     MAX_RETRIES: int = 3
     
+    # Google API
+    GOOGLE_API_KEY: Optional[str] = None
+    
     @property
     def database_url(self) -> str:
         """Construct database URL if not provided"""
@@ -45,7 +50,6 @@ class Settings(BaseSettings):
             return self.DATABASE_URL
         return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
     
-    class Config:
-        env_file = ".env"
+    model_config = ConfigDict(env_file=".env")
 
 settings = Settings()

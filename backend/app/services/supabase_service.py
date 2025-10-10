@@ -217,7 +217,8 @@ class StorageService:
             {
                 "apiKey": settings.SUPABASE_SERVICE_KEY,
                 "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-            }
+            },
+            is_async=False
         )
         self.bucket_name = settings.STORAGE_BUCKET_NAME
     

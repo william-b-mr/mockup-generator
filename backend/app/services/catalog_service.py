@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 import logging
 from datetime import datetime
 
-from app.services.supabase_service import SupabaseService
+from app.services.supabase_service import DatabaseService, StorageService
 from app.services.n8n_service import N8NService
 from app.models.schemas import (
     CatalogRequest,
@@ -22,7 +22,8 @@ logger = logging.getLogger(__name__)
 
 class CatalogService:
     def __init__(self):
-        self.supabase = SupabaseService()
+        self.db = DatabaseService()
+        self.storage = StorageService()
         self.n8n = N8NService()
     
     async def create_catalog(self, request: CatalogRequest) -> Dict[str, Any]:
@@ -141,7 +142,7 @@ class CatalogService:
                     detail="n8n logo processing workflow failed"
                 )
             
-            await self.supabase.update_job_status(job_id, JobStatus.PROCESSING.value, progress=30)
+            await self.db.update_job_status(job_id, JobStatus.PROCESSING.value, progress=30)
             
             # Step 2: Validate templates exist
             logger.info(f"[Job {job_id}] Step 2: Validating templates...")
@@ -171,7 +172,7 @@ class CatalogService:
                         
                         # Update progress
                         progress = 30 + int((processed_pages / total_pages) * 50)
-                        await self.supabase.update_job_status(
+                        await self.db.update_job_status(
                             job_id, 
                             JobStatus.PROCESSING.value,
                             progress=progress
@@ -197,7 +198,7 @@ class CatalogService:
             
             # Step 5: Update job as completed
             logger.info(f"[Job {job_id}] Completed! PDF: {pdf_response.pdf_url}")
-            await self.supabase.update_job_status(
+            await self.db.update_job_status(
                 job_id,
                 JobStatus.COMPLETED.value,
                 pdf_url=pdf_response.pdf_url,
@@ -206,7 +207,7 @@ class CatalogService:
             
         except Exception as e:
             logger.error(f"[Job {job_id}] Error: {e}")
-            await self.supabase.update_job_status(
+            await self.db.update_job_status(
                 job_id,
                 JobStatus.FAILED.value,
                 error_message=str(e)
