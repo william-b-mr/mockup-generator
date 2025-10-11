@@ -12,7 +12,6 @@ from app.models.schemas import (
     JobStatus,
     N8NLogoProcessingPayload,
     N8NPageGeneratorPayload,
-    N8NPDFAssemblyPayload
 )
 from app.core.exceptions import (
     TemplateNotFoundException,

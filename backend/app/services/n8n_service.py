@@ -6,8 +6,6 @@ from app.models.schemas import (
     N8NLogoProcessingResponse,
     N8NPageGeneratorPayload,
     N8NPageGeneratorResponse,
-    N8NPDFAssemblyPayload,
-    N8NPDFAssemblyResponse
 )
 import logging
 from typing import Dict, Any

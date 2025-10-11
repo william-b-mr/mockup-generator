@@ -9,8 +9,7 @@ import httpx
 from app.services.n8n_service import N8NService
 from app.models.schemas import (
     N8NLogoProcessingPayload,
-    N8NPageGeneratorPayload,
-    N8NPDFAssemblyPayload
+    N8NPageGeneratorPayload
 )
 from app.core.exceptions import N8NWorkflowException
 
