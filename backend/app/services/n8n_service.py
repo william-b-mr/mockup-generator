@@ -85,18 +85,3 @@ class N8NService:
         
         return N8NPageGeneratorResponse(**response)
     
-    async def assemble_pdf(
-        self, 
-        payload: N8NPDFAssemblyPayload
-    ) -> N8NPDFAssemblyResponse:
-        """Call PDF assembly workflow"""
-        logger.info(f"Assembling PDF for job {payload.job_id}")
-        
-        response = await self._call_webhook(
-            webhook_id=settings.N8N_PDF_ASSEMBLY_WEBHOOK,
-            payload=payload.dict(),
-            workflow_name="pdf_assembly"
-        )
-        
-        return N8NPDFAssemblyResponse(**response)
-

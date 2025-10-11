@@ -10,4 +10,7 @@ aiofiles==23.2.1
 python-jose[cryptography]==3.3.0
 redis==5.0.1
 asyncpg==0.29.0
-storage3==0.6.0
+storage3==0.6.0Pillow==10.1.0
+reportlab==4.0.7
+PyPDF2==3.0.1
+img2pdf==0.5.1

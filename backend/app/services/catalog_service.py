@@ -6,6 +6,7 @@ from datetime import datetime
 
 from app.services.supabase_service import DatabaseService, StorageService
 from app.services.n8n_service import N8NService
+from app.services.pdf_service import PDFService
 from app.models.schemas import (
     CatalogRequest,
     JobStatus,
@@ -25,6 +26,7 @@ class CatalogService:
         self.db = DatabaseService()
         self.storage = StorageService()
         self.n8n = N8NService()
+        self.pdf_service = PDFService()
     
     async def create_catalog(self, request: CatalogRequest) -> Dict[str, Any]:
         """Main orchestration method for catalog generation"""
@@ -184,24 +186,29 @@ class CatalogService:
             
             # Step 4: Assemble PDF
             logger.info(f"[Job {job_id}] Step 4: Assembling PDF...")
-            pdf_response = await self.n8n.assemble_pdf(
-                N8NPDFAssemblyPayload(
-                    job_id=job_id,
-                    customer_name=request.customer_name,
-                    industry=request.industry,
-                    page_urls=page_urls
-                )
+            pdf_bytes = await self.pdf.generate_complete_catalog(
+                            customer_name=request.customer_name,
+                            industry=request.industry,
+                            page_image_urls=page_urls,
+                            job_id=job_id
+                        )
+
+            # Upload PDF
+            pdf_url = await self.storage.upload_file(
+                f"catalogs/{job_id}.pdf",
+                pdf_bytes,
+                content_type='application/pdf'
             )
-            
-            if not pdf_response.success:
-                raise Exception("PDF assembly failed")
-            
+
+            if not pdf_url:
+                raise Exception("PDF upload failed")
+
             # Step 5: Update job as completed
-            logger.info(f"[Job {job_id}] Completed! PDF: {pdf_response.pdf_url}")
+            logger.info(f"[Job {job_id}] Completed! PDF: {pdf_url}")
             await self.db.update_job_status(
                 job_id,
                 JobStatus.COMPLETED.value,
-                pdf_url=pdf_response.pdf_url,
+                pdf_url=pdf_url,
                 progress=100
             )
             

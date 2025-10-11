@@ -85,14 +85,5 @@ class N8NPageGeneratorResponse(BaseModel):
     color: str
     success: bool
 
-class N8NPDFAssemblyPayload(BaseModel):
-    job_id: str
-    customer_name: str
-    industry: str
-    page_urls: List[str]
 
-class N8NPDFAssemblyResponse(BaseModel):
-    job_id: str
-    pdf_url: str
-    success: bool
 
