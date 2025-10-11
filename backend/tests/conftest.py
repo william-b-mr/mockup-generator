@@ -7,7 +7,7 @@ Fixtures provide reusable test data and setup/teardown logic.
 import pytest
 import asyncio
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 from typing import Dict, Any
 import uuid
 
@@ -17,8 +17,7 @@ from app.services.supabase_service import DatabaseService, StorageService
 from app.services.n8n_service import N8NService
 from app.models.schemas import (
     N8NLogoProcessingResponse,
-    N8NPageGeneratorResponse,
-    N8NPDFAssemblyResponse
+    N8NPageGeneratorResponse
 )
 
 # ===== HTTP CLIENT FIXTURES =====
@@ -144,14 +143,8 @@ def mock_n8n_page_response(sample_job_id: str) -> N8NPageGeneratorResponse:
     )
 
 
-@pytest.fixture
-def mock_n8n_pdf_response(sample_job_id: str) -> N8NPDFAssemblyResponse:
-    """Mock successful PDF assembly response from n8n"""
-    return N8NPDFAssemblyResponse(
-        job_id=sample_job_id,
-        pdf_url='https://example.com/catalogs/final.pdf',
-        success=True
-    )
+
+
 
 
 # ===== DATABASE FIXTURES (for integration tests) =====

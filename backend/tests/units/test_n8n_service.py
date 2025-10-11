@@ -4,7 +4,7 @@ Tests n8n webhook calls with mocked HTTP responses.
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 import httpx
 from app.services.n8n_service import N8NService
 from app.models.schemas import (
@@ -28,8 +28,8 @@ class TestN8NService:
     ):
         """Test successful logo processing workflow call"""
         # Setup
-        mock_response = AsyncMock()
-        mock_response.json.return_value = mock_n8n_logo_response.dict()
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_n8n_logo_response.model_dump()
         mock_response.raise_for_status = MagicMock()
         
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(
@@ -69,7 +69,7 @@ class TestN8NService:
         with pytest.raises(N8NWorkflowException) as exc_info:
             await service.process_logo(payload)
         
-        assert 'timeout' in str(exc_info.value.detail).lower()
+        assert 'timed out' in str(exc_info.value.detail).lower()
     
     @patch('httpx.AsyncClient')
     async def test_generate_page_success(
@@ -80,8 +80,8 @@ class TestN8NService:
     ):
         """Test successful page generation workflow call"""
         # Setup
-        mock_response = AsyncMock()
-        mock_response.json.return_value = mock_n8n_page_response.dict()
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_n8n_page_response.model_dump()
         mock_response.raise_for_status = MagicMock()
         
         mock_client.return_value.__aenter__.return_value.post = AsyncMock(

@@ -22,13 +22,11 @@ class Settings(BaseSettings):
     N8N_WEBHOOK_BASE_URL: str
     N8N_LOGO_PROCESSING_WEBHOOK: str
     N8N_PAGE_GENERATOR_WEBHOOK: str
-    N8N_PDF_ASSEMBLY_WEBHOOK: str
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
     
     # API
-    API_SECRET_KEY: str
     ENVIRONMENT: str = "development"
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:5173"]
     

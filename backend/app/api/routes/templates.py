@@ -1,19 +1,20 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
 from app.models.schemas import Template, TemplateCreate
-from app.services.supabase_service import SupabaseService
+from app.services.supabase_service import DatabaseService
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-supabase_service = SupabaseService()
+database_service = DatabaseService()
+
 
 @router.get("/", response_model=List[Template])
 async def get_all_templates():
     """Get all available templates"""
     try:
-        templates = await supabase_service.get_all_templates()
+        templates = await database_service.get_all_templates()
         return templates
     except Exception as e:
         logger.error(f"Error fetching templates: {e}")
@@ -23,7 +24,7 @@ async def get_all_templates():
 async def get_template(item_name: str, color: str):
     """Get template for specific item and color"""
     try:
-        template = await supabase_service.get_template(item_name, color)
+        template = await database_service.get_template(item_name, color)
         if not template:
             raise HTTPException(
                 status_code=404, 
@@ -40,7 +41,7 @@ async def get_template(item_name: str, color: str):
 async def create_template(template: TemplateCreate):
     """Create a new template"""
     try:
-        result = await supabase_service.create_template(template.dict())
+        result = await database_service.create_template(template.dict())
         return result
     except Exception as e:
         logger.error(f"Error creating template: {e}")

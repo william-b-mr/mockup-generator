@@ -25,8 +25,7 @@ class TestCompleteUserFlow:
         sample_catalog_request,
         sample_template,
         mock_n8n_logo_response,
-        mock_n8n_page_response,
-        mock_n8n_pdf_response
+        mock_n8n_page_response
     ):
         """
         Test complete user flow: Submit request -> Poll status -> Download PDF
@@ -73,9 +72,6 @@ class TestCompleteUserFlow:
         )
         mock_n8n_instance.generate_page = AsyncMock(
             return_value=mock_n8n_page_response
-        )
-        mock_n8n_instance.assemble_pdf = AsyncMock(
-            return_value=mock_n8n_pdf_response
         )
         
         # Step 1: User submits catalog generation request

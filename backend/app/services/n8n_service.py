@@ -59,7 +59,7 @@ class N8NService:
         
         response = await self._call_webhook(
             webhook_id=settings.N8N_LOGO_PROCESSING_WEBHOOK,
-            payload=payload.dict(),
+            payload=payload.model_dump(),
             workflow_name="logo_processing"
         )
         
@@ -77,7 +77,7 @@ class N8NService:
         
         response = await self._call_webhook(
             webhook_id=settings.N8N_PAGE_GENERATOR_WEBHOOK,
-            payload=payload.dict(),
+            payload=payload.model_dump(),
             workflow_name="page_generator"
         )
         
