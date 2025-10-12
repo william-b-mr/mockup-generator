@@ -36,10 +36,8 @@ class DatabaseService:
         """Get all templates"""
         try:
             query = """
-                SELECT id, item_name, color, template_url,
-                       logo_position_x, logo_position_y, logo_size,
-                       created_at, updated_at
-                FROM templates
+                SELECT id, item_name, color, template_url
+                FROM mockup_templates
                 ORDER BY item_name, color
             """
             rows = await db.fetch_all(query)

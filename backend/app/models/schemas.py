@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 
@@ -44,14 +44,10 @@ class JobStatusResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 class Template(BaseModel):
-    id: str
+    id: Union[str, int]          # Support both str and int IDs
     item_name: str
     color: str
-    template_url: str
-    logo_position_x: int
-    logo_position_y: int
-    logo_size: str  # "large" or "small"
-    created_at: Optional[datetime] = None
+    template_url: Optional[str] = None
 
 class TemplateCreate(BaseModel):
     item_name: str
