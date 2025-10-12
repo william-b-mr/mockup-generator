@@ -1,15 +1,33 @@
 from app.core.database import db
 from app.core.config import settings
-from storage3 import create_client as create_storage_client
+from supabase import create_client, Client
 from typing import List, Optional, Dict, Any
 import logging
 from datetime import datetime
 import uuid
+import json  
 
 logger = logging.getLogger(__name__)
 
 class DatabaseService:
     """Handle all database operations using direct PostgreSQL connection"""
+    
+    @staticmethod
+    def _serialize_json(data: Any) -> str:
+        """Convert Python object to JSON string for PostgreSQL JSONB"""
+        if isinstance(data, str):
+            return data
+        return json.dumps(data)
+    
+    @staticmethod
+    def _deserialize_json(data: Any) -> Any:
+        """Convert JSON string/dict from database to Python object"""
+        if isinstance(data, str):
+            try:
+                return json.loads(data)
+            except json.JSONDecodeError:
+                return data
+        return data  # Already a dict (asyncpg might return it as dict)
     
     # ===== TEMPLATE OPERATIONS =====
     
@@ -17,10 +35,8 @@ class DatabaseService:
         """Get template for specific item and color"""
         try:
             query = """
-                SELECT id, item_name, color, template_url, 
-                       logo_position_x, logo_position_y, logo_size,
-                       created_at, updated_at
-                FROM templates
+                SELECT id, item_name, color, template_url
+                FROM mockup_templates
                 WHERE item_name = $1 AND color = $2
             """
             row = await db.fetch_one(query, item_name, color)
@@ -70,7 +86,7 @@ class DatabaseService:
                 template_data.get('logo_position_y', 0),
                 template_data.get('logo_size', 'small')
             )
-            return dict(row)
+            return dict(row) if row else None
         except Exception as e:
             logger.error(f"Error creating template: {e}")
             raise
@@ -106,7 +122,7 @@ class DatabaseService:
                 template_data.get('logo_position_y', 0),
                 template_data.get('logo_size', 'small')
             )
-            return dict(row)
+            return dict(row) if row else None
         except Exception as e:
             logger.error(f"Error updating template: {e}")
             raise
@@ -116,12 +132,15 @@ class DatabaseService:
     async def create_job(self, job_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new catalog generation job"""
         try:
+            # FIXED: Convert metadata dict to JSON string for JSONB column
+            metadata_json = self._serialize_json(job_data.get('metadata', {}))
+            
             query = """
                 INSERT INTO jobs (
                     id, customer_name, industry, status,
                     progress, metadata, created_at, updated_at
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())
                 RETURNING id, customer_name, industry, status,
                           progress, pdf_url, error_message, metadata,
                           created_at, updated_at
@@ -133,9 +152,16 @@ class DatabaseService:
                 job_data['industry'],
                 job_data['status'],
                 job_data.get('progress', 0),
-                job_data.get('metadata', {})
+                metadata_json  # FIXED: Pass as JSON string with ::jsonb cast
             )
-            return dict(row)
+            
+            if row:
+                result = dict(row)
+                # Convert metadata back to dict for response
+                result['metadata'] = self._deserialize_json(result.get('metadata'))
+                return result
+            return None
+            
         except Exception as e:
             logger.error(f"Error creating job: {e}")
             raise
@@ -153,7 +179,10 @@ class DatabaseService:
             row = await db.fetch_one(query, job_id)
             
             if row:
-                return dict(row)
+                result = dict(row)
+                # FIXED: Convert metadata back to dict for response
+                result['metadata'] = self._deserialize_json(result.get('metadata'))
+                return result
             return None
         except Exception as e:
             logger.error(f"Error fetching job: {e}")
@@ -166,7 +195,7 @@ class DatabaseService:
         pdf_url: Optional[str] = None,
         error_message: Optional[str] = None,
         progress: Optional[int] = None
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:  # FIXED: Return Optional instead of Dict
         """Update job status"""
         try:
             # Build dynamic query based on provided parameters
@@ -199,26 +228,33 @@ class DatabaseService:
             """
             
             row = await db.fetch_one(query, *params)
-            return dict(row)
+            
+            if row:
+                result = dict(row)
+                # FIXED: Convert metadata back to dict for response
+                result['metadata'] = self._deserialize_json(result.get('metadata'))
+                return result
+            
+            # FIXED: Return None if job not found instead of raising error
+            logger.warning(f"Job {job_id} not found for status update")
+            return None
+            
         except Exception as e:
             logger.error(f"Error updating job status: {e}")
             raise
 
 
 class StorageService:
-    """Handle all Supabase Storage operations"""
+    """Handle all Supabase Storage operations - FIXED VERSION"""
     
     def __init__(self):
-        # Initialize Supabase Storage client only
-        self.storage = create_storage_client(
+        # Use full Supabase client for proper storage access
+        self.client: Client = create_client(
             settings.SUPABASE_URL,
-            {
-                "apiKey": settings.SUPABASE_SERVICE_KEY,
-                "Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}"
-            },
-            is_async=False
+            settings.SUPABASE_SERVICE_KEY
         )
         self.bucket_name = settings.STORAGE_BUCKET_NAME
+        logger.info(f"Storage client initialized for bucket: {self.bucket_name}")
     
     async def upload_file(
         self, 
@@ -228,28 +264,65 @@ class StorageService:
     ) -> str:
         """Upload file to Supabase Storage"""
         try:
-            response = self.storage.from_(self.bucket_name).upload(
-                file_path,
-                file_content,
-                file_options={"content-type": content_type}
+            # Remove leading slashes
+            file_path = file_path.lstrip('/')
+            
+            logger.info(f"Uploading file:")
+            logger.info(f"  Bucket: {self.bucket_name}")
+            logger.info(f"  Path: {file_path}")
+            logger.info(f"  Size: {len(file_content)} bytes")
+            logger.info(f"  Type: {content_type}")
+            
+            # Upload using Supabase client
+            res = self.client.storage.from_(self.bucket_name).upload(
+                path=file_path,
+                file=file_content,
+                file_options={
+                    "content-type": content_type,
+                    "upsert": "true"  # Overwrite if exists
+                }
             )
             
+            logger.info(f"Upload response: {res}")
+            
             # Get public URL
-            public_url = self.storage.from_(self.bucket_name).get_public_url(file_path)
-            logger.info(f"File uploaded successfully: {file_path}")
+            public_url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
+            
+            logger.info(f"✓ Upload successful: {public_url}")
             return public_url
+            
         except Exception as e:
-            logger.error(f"Error uploading file: {e}")
-            raise
+            logger.error(f"✗ Upload failed:")
+            logger.error(f"  Error: {e}")
+            logger.error(f"  Error type: {type(e)}")
+            logger.error(f"  Path: {file_path}")
+            logger.error(f"  Bucket: {self.bucket_name}")
+            
+            # Better error messages
+            error_str = str(e)
+            if "Bucket not found" in error_str or "404" in error_str:
+                raise Exception(
+                    f"Bucket '{self.bucket_name}' not found. "
+                    f"Create it in Supabase Dashboard → Storage → New Bucket"
+                )
+            elif "already exists" in error_str.lower():
+                # File exists, try to get its URL
+                public_url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
+                logger.info(f"File already exists, returning existing URL: {public_url}")
+                return public_url
+            else:
+                raise Exception(f"Storage upload failed: {error_str}")
     
     async def get_file_url(self, file_path: str) -> str:
         """Get public URL for a file"""
-        return self.storage.from_(self.bucket_name).get_public_url(file_path)
+        file_path = file_path.lstrip('/')
+        return self.client.storage.from_(self.bucket_name).get_public_url(file_path)
     
     async def delete_file(self, file_path: str) -> bool:
         """Delete file from storage"""
         try:
-            self.storage.from_(self.bucket_name).remove([file_path])
+            file_path = file_path.lstrip('/')
+            self.client.storage.from_(self.bucket_name).remove([file_path])
             logger.info(f"File deleted successfully: {file_path}")
             return True
         except Exception as e:

@@ -25,7 +25,7 @@ class CatalogService:
         self.db = DatabaseService()
         self.storage = StorageService()
         self.n8n = N8NService()
-        self.pdf_service = PDFService()
+        self.pdf = PDFService()
     
     async def create_catalog(self, request: CatalogRequest) -> Dict[str, Any]:
         """Main orchestration method for catalog generation"""
