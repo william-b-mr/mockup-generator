@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from contextlib import asynccontextmanager
 import logging
 
 from app.api.routes import catalog, jobs, templates, health
@@ -15,12 +16,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown"""
+    # Startup
+    logger.info("Starting Catalog Generator API...")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    
+    try:
+        await db.connect()
+        logger.info("Database connection pool initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize database: {e}")
+        raise
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Catalog Generator API...")
+    await db.disconnect()
+    logger.info("Database connection pool closed")
+
 app = FastAPI(
     title="Catalog Generator API",
     description="Backend API for generating personalized mockup catalogs",
     version="1.0.0",
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    lifespan=lifespan
 )
 
 # CORS configuration
@@ -46,22 +69,3 @@ app.include_router(catalog.router, prefix="/api/catalog", tags=["Catalog"])
 app.include_router(jobs.router, prefix="/api/jobs", tags=["Jobs"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database connection pool on startup"""
-    logger.info("Starting Catalog Generator API...")
-    logger.info(f"Environment: {settings.ENVIRONMENT}")
-    
-    try:
-        await db.connect()
-        logger.info("Database connection pool initialized")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-        raise
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Close database connection pool on shutdown"""
-    logger.info("Shutting down Catalog Generator API...")
-    await db.disconnect()
-    logger.info("Database connection pool closed")
