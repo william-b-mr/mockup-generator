@@ -180,6 +180,8 @@ class DatabaseService:
             
             if row:
                 result = dict(row)
+                # Convert 'id' to 'job_id' to match API schema and ensure it's a string
+                result['job_id'] = str(result.pop('id'))
                 # FIXED: Convert metadata back to dict for response
                 result['metadata'] = self._deserialize_json(result.get('metadata'))
                 return result
@@ -231,6 +233,8 @@ class DatabaseService:
             
             if row:
                 result = dict(row)
+                # Convert 'id' to 'job_id' to match API schema and ensure it's a string
+                result['job_id'] = str(result.pop('id'))
                 # FIXED: Convert metadata back to dict for response
                 result['metadata'] = self._deserialize_json(result.get('metadata'))
                 return result

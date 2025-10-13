@@ -1,13 +1,12 @@
-// File utilities and helper functions
 export const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64String = reader.result.split(',')[1];
-      resolve(base64String);
+    reader.onloadend = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
     };
-    reader.onerror = (error) => reject(error);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 };
 
@@ -16,5 +15,5 @@ export const validateLogoSize = (file, maxSize) => {
 };
 
 export const getUniqueValues = (array, key) => {
-  return [...new Set(array.map(item => item[key]))].filter(Boolean);
+  return [...new Set(array.map(item => item[key]))];
 };

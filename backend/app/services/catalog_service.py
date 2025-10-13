@@ -225,7 +225,7 @@ class CatalogService:
         # Rough estimate: 10 seconds per page + 30 seconds overhead
         return (total_pages * 10) + 30
     
-async def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    async def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """Get job status from database"""
         job = await self.db.get_job(job_id)
         if not job:
