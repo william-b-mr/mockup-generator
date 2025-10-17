@@ -22,68 +22,143 @@ class PDFService:
     
     async def generate_front_page(
         self, 
-        customer_name: str, 
-        industry: str
+        customer_name: str,
+        customer_image: bytes = None,
     ) -> bytes:
         """
         Generate a beautiful front page PDF
         
         Args:
             customer_name: Customer name for the front page
-            industry: Industry for the front page
-            
+            customer_image: Optional customer image bytes (if None, shows placeholder)
+
         Returns:
             PDF bytes
         """
         try:
+            logo_path = "assets/logo.png"
+            
             # Create PDF buffer
             buffer = io.BytesIO()
             c = canvas.Canvas(buffer, pagesize=self.page_size)
             width, height = self.page_size
             
-            # Background gradient (simulated with rectangles)
-            # Purple gradient: #667eea to #764ba2
-            for i in range(100):
-                # Create gradient effect
-                r = int(102 + (118 - 102) * i / 100)  # 102 -> 118
-                g = int(126 + (75 - 126) * i / 100)   # 126 -> 75
-                b = int(234 + (162 - 234) * i / 100)  # 234 -> 162
-                
-                c.setFillColorRGB(r/255, g/255, b/255)
-                c.rect(0, height - (height * i / 100), width, height / 100, 
-                       stroke=0, fill=1)
+            # 1. RED HEADER SECTION
+            # Draw red header rectangle (reduced to ~15% of page height)
+            header_height = height * 0.10
+            c.setFillColor(self.mbc_red)
+            c.rect(0, height - header_height, width, header_height, stroke=0, fill=1)
             
-            # White text
-            c.setFillColorRGB(1, 1, 1)
+            # Add MBC Logo (bigger, more to the left)
+            try:
+                logo = Image.open(logo_path)
+                logo_reader = ImageReader(logo)
+                # Position: 20pt from left, centered vertically in header
+                logo_width = 230  # Increased from 160
+                logo_height = 75  # Increased from 60
+                logo_y = height - header_height + (header_height - logo_height) / 2
+                c.drawImage(
+                    logo_reader,
+                    10,  # More to the left (was 40)
+                    logo_y,
+                    width=logo_width,
+                    height=logo_height,
+                    preserveAspectRatio=True,
+                    mask='auto'
+                )
+            except Exception as e:
+                logger.warning(f"Could not load logo: {e}")
+                # Fallback: Draw text logo (also bigger and more left)
+                c.setFillColor(HexColor('#FFFFFF'))
+                c.setFont("Helvetica-Bold", 56)  # Bigger font
+                logo_y = height - header_height + (header_height / 2) - 10
+                c.drawString(20, logo_y, "MBC")
+                c.setFont("Helvetica", 16)
+                c.drawString(20, logo_y - 25, "FARDAMENTO")
             
-            # Title: "PRODUCT CATALOG"
-            c.setFont("Helvetica", 16)
-            text_width = c.stringWidth("PRODUCT CATALOG", "Helvetica", 16)
-            c.drawString((width - text_width) / 2, height - 200, "PRODUCT CATALOG")
+            # Add tagline (right side of header, vertically centered)
+            c.setFillColor(HexColor('#FFFFFF'))
+            c.setFont("Helvetica", 18)
+            tagline = "Uniformes com identidade"
+            text_width = c.stringWidth(tagline, "Helvetica", 18)
+            tagline_y = height - header_height + (header_height / 2) - 6
+            c.drawString(width - text_width - 40, tagline_y, tagline)
             
-            # Divider line
-            c.setStrokeColorRGB(1, 1, 1)
-            c.setLineWidth(2)
-            c.line(width/2 - 100, height - 220, width/2 + 100, height - 220)
+            # 2. MAIN CONTENT SECTION (White background)
+            # Title: "Catálogo Personalizado"
+            c.setFillColor(self.mbc_dark)
+            c.setFont("Helvetica-Bold", 24)
+            title = "Catálogo Personalizado"
+            text_width = c.stringWidth(title, "Helvetica-Bold", 36)
+            c.drawString((width - text_width) / 2, height - 150, title)
             
-            # Customer Name (large)
+            # Customer Name (large, centered)
             c.setFont("Helvetica-Bold", 48)
             text_width = c.stringWidth(customer_name, "Helvetica-Bold", 48)
-            c.drawString((width - text_width) / 2, height - 300, customer_name)
+            c.drawString((width - text_width) / 2, height - 200, customer_name)
             
-            # Industry
-            c.setFont("Helvetica", 24)
-            text_width = c.stringWidth(industry, "Helvetica", 24)
-            c.drawString((width - text_width) / 2, height - 350, industry)
+            # 3. CUSTOMER IMAGE OR PLACEHOLDER
+            image_width = 350
+            image_height = 250
+            image_x = (width - image_width) / 2
+            image_y = height - 700  # Position below customer name
             
-            # Divider line
-            c.line(width/2 - 100, height - 380, width/2 + 100, height - 380)
+            if customer_image:
+                try:
+                    # Use provided customer image
+                    img = Image.open(io.BytesIO(customer_image))
+                    img_reader = ImageReader(img)
+                    c.drawImage(
+                        img_reader,
+                        image_x,
+                        image_y,
+                        width=image_width,
+                        height=image_height,
+                        preserveAspectRatio=True
+                    )
+                except Exception as e:
+                    logger.error(f"Error loading customer image: {e}")
+                    # Fall back to placeholder
+                    self._draw_image_placeholder(c, image_x, image_y, image_width, image_height)
+            else:
+                # Draw placeholder rectangle
+                self._draw_image_placeholder(c, image_x, image_y, image_width, image_height)
             
-            # Date
-            current_date = datetime.now().strftime("%B %d, %Y")
-            c.setFont("Helvetica", 14)
-            text_width = c.stringWidth(current_date, "Helvetica", 14)
-            c.drawString((width - text_width) / 2, height - 500, current_date)
+            # 4. FOOTER SECTION (Red gradient)
+            # Create gradient effect at bottom
+            footer_height = 80
+            gradient_start = 120
+            
+            # Draw gradient (fade from transparent to red)
+            for i in range(50):
+                opacity = i / 50.0
+                # Create pink to red gradient effect
+                r = 220 + (220 - 220) * opacity
+                g = 38 + (150 - 38) * opacity
+                b = 38 + (150 - 38) * opacity
+                c.setFillColorRGB(r/255, g/255, b/255, alpha=opacity * 0.3)
+                c.rect(0, gradient_start - (i * 2), width, 2, stroke=0, fill=1)
+            
+            # Solid red footer
+            c.setFillColor(self.mbc_red)
+            c.rect(0, 0, width, footer_height, stroke=0, fill=1)
+            
+            # Footer contact information
+            c.setFillColor(HexColor('#FFFFFF'))
+            c.setFont("Helvetica", 12)
+            
+            # Email (left)
+            c.drawString(40, 40, "geral@mbcfardamento.com")
+            
+            # Phone (center)
+            phone = "+351 939 557 088"
+            text_width = c.stringWidth(phone, "Helvetica", 12)
+            c.drawString((width - text_width) / 2, 40, phone)
+            
+            # Location (right)
+            location = "Dalvares, Viseu, Portugal"
+            text_width = c.stringWidth(location, "Helvetica", 12)
+            c.drawString(width - text_width - 40, 40, location)
             
             # Save PDF
             c.save()
@@ -296,7 +371,7 @@ class PDFService:
                     image_data = await self.download_image(image_url)
                     
                     # Convert to PDF
-                    page_pdf = await self.convert_image_to_pdf(image_data, fit_to_page=True)
+                    page_pdf = await self.convert_image_to_pdf(image_data, fit_to_page=False)
                     pdfs.append(page_pdf)
                     
                     logger.info(f"[Job {job_id}] Converted page {idx}/{len(page_image_urls)}")
