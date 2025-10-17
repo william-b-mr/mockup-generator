@@ -12,7 +12,8 @@ class JobStatus(str, Enum):
 class CatalogRequest(BaseModel):
     customer_name: str = Field(..., min_length=1, max_length=200)
     industry: str = Field(..., min_length=1, max_length=100)
-    logo: str = Field(..., description="Base64 encoded logo or file upload")
+    logo_dark: str = Field(..., description="Base64 encoded logo for dark backgrounds")
+    logo_light: str = Field(..., description="Base64 encoded logo for light backgrounds")
     items: List[str] = Field(..., min_length=1, max_length=50)
     colors: List[str] = Field(..., min_length=1, max_length=20)
     
@@ -48,6 +49,7 @@ class Template(BaseModel):
     item_name: str
     color: str
     template_url: Optional[str] = None
+    background: Optional[str] = None  # "light" or "dark"
 
 class TemplateCreate(BaseModel):
     item_name: str
@@ -59,12 +61,15 @@ class TemplateCreate(BaseModel):
 
 class N8NLogoProcessingPayload(BaseModel):
     job_id: str
-    logo_url: str
+    logo_dark_url: str
+    logo_light_url: str
 
 class N8NLogoProcessingResponse(BaseModel):
     job_id: str
-    logo_large_url: str
-    logo_small_url: str
+    logo_dark_large_url: str
+    logo_dark_small_url: str
+    logo_light_large_url: str
+    logo_light_small_url: str
     success: bool
 
 class N8NPageGeneratorPayload(BaseModel):
@@ -73,6 +78,7 @@ class N8NPageGeneratorPayload(BaseModel):
     color: str
     logo_large_url: str
     logo_small_url: str
+    background: str  # "light" or "dark" - determines which logo to use
 
 class N8NPageGeneratorResponse(BaseModel):
     job_id: str

@@ -39,7 +39,8 @@ class TestN8NService:
         service = N8NService()
         payload = N8NLogoProcessingPayload(
             job_id=sample_job_id,
-            logo_url='https://example.com/logo.png'
+            logo_dark_url='https://example.com/logo_dark.png',
+            logo_light_url='https://example.com/logo_light.png'
         )
         
         # Execute
@@ -48,8 +49,10 @@ class TestN8NService:
         # Verify
         assert result.success is True
         assert result.job_id == sample_job_id
-        assert 'large.png' in result.logo_large_url
-        assert 'small.png' in result.logo_small_url
+        assert 'dark_large.png' in result.logo_dark_large_url
+        assert 'dark_small.png' in result.logo_dark_small_url
+        assert 'light_large.png' in result.logo_light_large_url
+        assert 'light_small.png' in result.logo_light_small_url
     
     @patch('httpx.AsyncClient')
     async def test_process_logo_timeout(self, mock_client, sample_job_id):
@@ -62,7 +65,8 @@ class TestN8NService:
         service = N8NService()
         payload = N8NLogoProcessingPayload(
             job_id=sample_job_id,
-            logo_url='https://example.com/logo.png'
+            logo_dark_url='https://example.com/logo_dark.png',
+            logo_light_url='https://example.com/logo_light.png'
         )
         
         # Execute & Assert
@@ -94,7 +98,8 @@ class TestN8NService:
             item='Sweatshirt',
             color='Red',
             logo_large_url='https://example.com/large.png',
-            logo_small_url='https://example.com/small.png'
+            logo_small_url='https://example.com/small.png',
+            background='light'
         )
         
         # Execute

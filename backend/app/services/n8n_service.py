@@ -54,8 +54,8 @@ class N8NService:
         self, 
         payload: N8NLogoProcessingPayload
     ) -> N8NLogoProcessingResponse:
-        """Call logo processing workflow"""
-        logger.info(f"Calling logo processing workflow for job {payload.job_id}")
+        """Call logo processing workflow for both dark and light logos"""
+        logger.info(f"Calling logo processing workflow for job {payload.job_id} with dual logos")
         
         response = await self._call_webhook(
             webhook_id=settings.N8N_LOGO_PROCESSING_WEBHOOK,
@@ -72,7 +72,7 @@ class N8NService:
         """Call page generator workflow"""
         logger.info(
             f"Generating page for job {payload.job_id}: "
-            f"{payload.item} - {payload.color}"
+            f"{payload.item} - {payload.color} (background: {payload.background})"
         )
         
         response = await self._call_webhook(

@@ -35,7 +35,7 @@ class DatabaseService:
         """Get template for specific item and color"""
         try:
             query = """
-                SELECT id, item_name, color, template_url
+                SELECT id, item_name, color, template_url, background
                 FROM mockup_templates
                 WHERE item_name = $1 AND color = $2
             """
@@ -52,7 +52,7 @@ class DatabaseService:
         """Get all templates"""
         try:
             query = """
-                SELECT id, item_name, color, template_url
+                SELECT id, item_name, color, template_url, background
                 FROM mockup_templates
                 ORDER BY item_name, color
             """

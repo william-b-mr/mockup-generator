@@ -12,8 +12,10 @@ export default function CatalogGenerator() {
   const [customerName, setCustomerName] = useState('');
   const [industry, setIndustry] = useState('construction');
   const [catalogType, setCatalogType] = useState('custom');
-  const [logoFile, setLogoFile] = useState(null);
-  const [logoPreview, setLogoPreview] = useState('');
+  const [logoDarkFile, setLogoDarkFile] = useState(null);
+  const [logoLightFile, setLogoLightFile] = useState(null);
+  const [logoDarkPreview, setLogoDarkPreview] = useState('');
+  const [logoLightPreview, setLogoLightPreview] = useState('');
   
   const [availableItems, setAvailableItems] = useState([]);
   const [availableColors, setAvailableColors] = useState([]);
@@ -47,7 +49,7 @@ export default function CatalogGenerator() {
     }
   };
 
-  const handleLogoChange = (e) => {
+  const handleLogoDarkChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -56,9 +58,24 @@ export default function CatalogGenerator() {
       return;
     }
 
-    setLogoFile(file);
+    setLogoDarkFile(file);
     const reader = new FileReader();
-    reader.onloadend = () => setLogoPreview(reader.result);
+    reader.onloadend = () => setLogoDarkPreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleLogoLightChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!validateLogoSize(file, MAX_LOGO_SIZE)) {
+      setError('O logótipo não pode exceder 10MB');
+      return;
+    }
+
+    setLogoLightFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setLogoLightPreview(reader.result);
     reader.readAsDataURL(file);
   };
 
@@ -115,8 +132,8 @@ export default function CatalogGenerator() {
       setError('Por favor, insira o nome do cliente');
       return;
     }
-    if (!logoFile) {
-      setError('Por favor, carregue o logótipo');
+    if (!logoDarkFile || !logoLightFile) {
+      setError('Por favor, carregue ambos os logótipos (fundo escuro e claro)');
       return;
     }
     if (catalogType === 'custom' && (selectedItems.length === 0 || selectedColors.length === 0)) {
@@ -127,7 +144,8 @@ export default function CatalogGenerator() {
     setLoading(true);
 
     try {
-      const base64Logo = await fileToBase64(logoFile);
+      const base64LogoDark = await fileToBase64(logoDarkFile);
+      const base64LogoLight = await fileToBase64(logoLightFile);
       
       let items, colors;
       if (catalogType === 'custom') {
@@ -141,7 +159,8 @@ export default function CatalogGenerator() {
       const payload = {
         customer_name: customerName,
         industry: industry,
-        logo: base64Logo,
+        logo_dark: base64LogoDark,
+        logo_light: base64LogoLight,
         items: items,
         colors: colors
       };
@@ -198,30 +217,72 @@ export default function CatalogGenerator() {
           {/* Logo Upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Logótipo *
+              Logótipos *
             </label>
-            <div className="flex items-center space-x-4">
-              <label className="flex-1 flex items-center justify-center px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-mbc-red transition">
-                <div className="text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <p className="mt-2 text-sm text-gray-600">
-                    {logoFile ? logoFile.name : 'Carregar logótipo'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">PNG, JPG até 10MB</p>
+            <p className="text-sm text-gray-600 mb-4">
+              Carregue duas versões do seu logótipo: uma para fundos escuros e outra para fundos claros
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Dark Background Logo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Logo para Fundo Escuro
+                </label>
+                <div className="space-y-4">
+                  <label className="flex items-center justify-center px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-mbc-red transition">
+                    <div className="text-center">
+                      <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                      <p className="mt-2 text-sm text-gray-600">
+                        {logoDarkFile ? logoDarkFile.name : 'Carregar logo'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">PNG, JPG até 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoDarkChange}
+                      className="hidden"
+                      disabled={loading}
+                    />
+                  </label>
+                  {logoDarkPreview && (
+                    <div className="w-full h-32 border rounded-lg overflow-hidden bg-gray-800">
+                      <img src={logoDarkPreview} alt="Preview Dark" className="w-full h-full object-contain p-2" />
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                  className="hidden"
-                  disabled={loading}
-                />
-              </label>
-              {logoPreview && (
-                <div className="w-32 h-32 border rounded-lg overflow-hidden bg-gray-50">
-                  <img src={logoPreview} alt="Preview" className="w-full h-full object-contain p-2" />
+              </div>
+
+              {/* Light Background Logo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Logo para Fundo Claro
+                </label>
+                <div className="space-y-4">
+                  <label className="flex items-center justify-center px-4 py-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-mbc-red transition">
+                    <div className="text-center">
+                      <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                      <p className="mt-2 text-sm text-gray-600">
+                        {logoLightFile ? logoLightFile.name : 'Carregar logo'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">PNG, JPG até 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoLightChange}
+                      className="hidden"
+                      disabled={loading}
+                    />
+                  </label>
+                  {logoLightPreview && (
+                    <div className="w-full h-32 border rounded-lg overflow-hidden bg-gray-100">
+                      <img src={logoLightPreview} alt="Preview Light" className="w-full h-full object-contain p-2" />
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

@@ -1,14 +1,13 @@
 from PIL import Image
+from pathlib import Path
 from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.colors import HexColor
 from pypdf import PdfMerger, PdfReader, PdfWriter
 import io
 import httpx
-from typing import List, BinaryIO
-from datetime import datetime
+from typing import List
 import logging
 
 logger = logging.getLogger(__name__)
@@ -19,6 +18,9 @@ class PDFService:
     
     def __init__(self):
         self.page_size = A4  # (595, 842) points
+        self.mbc_red = HexColor('#d11720')  # Red color from the template
+        self.mbc_dark = HexColor('#000000')  # Black for text
+        self.mbc_gray = HexColor('#9CA3AF')  # Gray for placeholder
     
     async def generate_front_page(
         self, 
@@ -36,7 +38,6 @@ class PDFService:
             PDF bytes
         """
         try:
-            logo_path = "assets/logo.png"
             
             # Create PDF buffer
             buffer = io.BytesIO()
@@ -49,32 +50,40 @@ class PDFService:
             c.setFillColor(self.mbc_red)
             c.rect(0, height - header_height, width, header_height, stroke=0, fill=1)
             
-            # Add MBC Logo (bigger, more to the left)
+            # Add MBC Logo (Fixed path and positioning)
             try:
+                base_dir = Path(__file__).resolve().parent
+                
+                logo_path = base_dir / "assets" / "logo.png"
+
                 logo = Image.open(logo_path)
-                logo_reader = ImageReader(logo)
-                # Position: 20pt from left, centered vertically in header
-                logo_width = 230  # Increased from 160
-                logo_height = 75  # Increased from 60
-                logo_y = height - header_height + (header_height - logo_height) / 2
-                c.drawImage(
-                    logo_reader,
-                    10,  # More to the left (was 40)
-                    logo_y,
-                    width=logo_width,
-                    height=logo_height,
-                    preserveAspectRatio=True,
-                    mask='auto'
-                )
+
+                if logo:
+                    logo_reader = ImageReader(logo)
+                    # Better positioning and sizing for professional look
+                    logo_width = 250  # Increased size for better visibility
+                    logo_height = 75   # Proportional height
+                    logo_y = height - header_height + (header_height - logo_height) / 2
+                    c.drawImage(
+                        logo_reader,
+                        5,  # More to the left
+                        logo_y,
+                        width=logo_width,
+                        height=logo_height,
+                        preserveAspectRatio=True,
+                        mask='auto'
+                    )
+                else:
+                    raise FileNotFoundError("Logo not found in any expected location")
             except Exception as e:
                 logger.warning(f"Could not load logo: {e}")
                 # Fallback: Draw text logo (also bigger and more left)
                 c.setFillColor(HexColor('#FFFFFF'))
-                c.setFont("Helvetica-Bold", 56)  # Bigger font
+                c.setFont("Helvetica-Bold", 64)  # Bigger font
                 logo_y = height - header_height + (header_height / 2) - 10
-                c.drawString(20, logo_y, "MBC")
-                c.setFont("Helvetica", 16)
-                c.drawString(20, logo_y - 25, "FARDAMENTO")
+                c.drawString(15, logo_y, "MBC")
+                c.setFont("Helvetica", 18)
+                c.drawString(15, logo_y - 30, "FARDAMENTO")
             
             # Add tagline (right side of header, vertically centered)
             c.setFillColor(HexColor('#FFFFFF'))
@@ -85,23 +94,23 @@ class PDFService:
             c.drawString(width - text_width - 40, tagline_y, tagline)
             
             # 2. MAIN CONTENT SECTION (White background)
-            # Title: "Catálogo Personalizado"
+            # Title: "Catálogo Personalizado" (Fixed font size consistency)
             c.setFillColor(self.mbc_dark)
-            c.setFont("Helvetica-Bold", 24)
+            c.setFont("Helvetica-Bold", 36)  # Increased font size
             title = "Catálogo Personalizado"
-            text_width = c.stringWidth(title, "Helvetica-Bold", 36)
-            c.drawString((width - text_width) / 2, height - 150, title)
+            text_width = c.stringWidth(title, "Helvetica-Bold", 36)  # Fixed to match font size
+            c.drawString((width - text_width) / 2, height - 160, title)
             
             # Customer Name (large, centered)
             c.setFont("Helvetica-Bold", 48)
             text_width = c.stringWidth(customer_name, "Helvetica-Bold", 48)
-            c.drawString((width - text_width) / 2, height - 200, customer_name)
+            c.drawString((width - text_width) / 2, height - 230, customer_name)  # Adjusted spacing
             
-            # 3. CUSTOMER IMAGE OR PLACEHOLDER
-            image_width = 350
-            image_height = 250
+            # 3. CUSTOMER IMAGE OR PLACEHOLDER (Moved higher)
+            image_width = 380  # Slightly larger
+            image_height = 280  # Slightly larger
             image_x = (width - image_width) / 2
-            image_y = height - 700  # Position below customer name
+            image_y = height - 580  # Moved significantly higher (was -700)
             
             if customer_image:
                 try:
@@ -124,41 +133,63 @@ class PDFService:
                 # Draw placeholder rectangle
                 self._draw_image_placeholder(c, image_x, image_y, image_width, image_height)
             
-            # 4. FOOTER SECTION (Red gradient)
-            # Create gradient effect at bottom
-            footer_height = 80
-            gradient_start = 120
+            # 4. PROFESSIONAL DECORATIVE ELEMENTS
+            # Add subtle design lines for professional touch
+            c.setStrokeColor(self.mbc_red)
+            c.setLineWidth(2)
+            # Horizontal line under title
+            line_y = height - 280
+            line_margin = 100
+            c.line(line_margin, line_y, width - line_margin, line_y)
             
-            # Draw gradient (fade from transparent to red)
-            for i in range(50):
-                opacity = i / 50.0
-                # Create pink to red gradient effect
-                r = 220 + (220 - 220) * opacity
-                g = 38 + (150 - 38) * opacity
-                b = 38 + (150 - 38) * opacity
-                c.setFillColorRGB(r/255, g/255, b/255, alpha=opacity * 0.3)
-                c.rect(0, gradient_start - (i * 2), width, 2, stroke=0, fill=1)
+            # Add subtle shadow effect around image area
+            shadow_offset = 3
+            c.setFillColorRGB(0.9, 0.9, 0.9, alpha=0.5)  # Light gray shadow
+            c.rect(image_x + shadow_offset, image_y - shadow_offset, image_width, image_height, stroke=0, fill=1)
             
-            # Solid red footer
+            # 5. FOOTER SECTION (Improved professional footer)
+            footer_height = 100  # Increased height
+            
+            # Professional gradient effect
+            for i in range(30):
+                opacity = (30 - i) / 30.0 * 0.15  # Subtle gradient
+                c.setFillColorRGB(0.82, 0.09, 0.125, alpha=opacity)
+                c.rect(0, footer_height + (i * 2), width, 2, stroke=0, fill=1)
+            
+            # Main footer background
             c.setFillColor(self.mbc_red)
             c.rect(0, 0, width, footer_height, stroke=0, fill=1)
             
-            # Footer contact information
+            # Professional footer contact information
             c.setFillColor(HexColor('#FFFFFF'))
-            c.setFont("Helvetica", 12)
+            
+            # Company name in footer
+            c.setFont("Helvetica-Bold", 14)
+            company_text = "MBC FARDAMENTO"
+            company_width = c.stringWidth(company_text, "Helvetica-Bold", 14)
+            c.drawString((width - company_width) / 2, 65, company_text)
+            
+            # Contact details in smaller font
+            c.setFont("Helvetica", 11)
             
             # Email (left)
-            c.drawString(40, 40, "geral@mbcfardamento.com")
+            c.drawString(40, 35, "✉ geral@mbcfardamento.com")
             
             # Phone (center)
-            phone = "+351 939 557 088"
-            text_width = c.stringWidth(phone, "Helvetica", 12)
-            c.drawString((width - text_width) / 2, 40, phone)
+            phone = "📞 +351 939 557 088"
+            text_width = c.stringWidth(phone, "Helvetica", 11)
+            c.drawString((width - text_width) / 2, 35, phone)
             
             # Location (right)
-            location = "Dalvares, Viseu, Portugal"
-            text_width = c.stringWidth(location, "Helvetica", 12)
-            c.drawString(width - text_width - 40, 40, location)
+            location = "📍 Dalvares, Viseu, Portugal"
+            text_width = c.stringWidth(location, "Helvetica", 11)
+            c.drawString(width - text_width - 40, 35, location)
+            
+            # Website centered at bottom
+            c.setFont("Helvetica", 10)
+            website = "www.mbcfardamento.com"
+            website_width = c.stringWidth(website, "Helvetica", 10)
+            c.drawString((width - website_width) / 2, 15, website)
             
             # Save PDF
             c.save()
@@ -192,7 +223,30 @@ class PDFService:
         except Exception as e:
             logger.error(f"Error downloading image from {url}: {e}")
             raise
-    
+        
+    def _draw_image_placeholder(self, canvas_obj, x, y, width, height):
+        """
+        Draw a gray placeholder rectangle with text
+        
+        Args:
+            canvas_obj: ReportLab canvas object
+            x, y: Position coordinates
+            width, height: Dimensions of placeholder
+        """
+        # Draw gray rectangle
+        canvas_obj.setFillColor(self.mbc_gray)
+        canvas_obj.rect(x, y, width, height, stroke=0, fill=1)
+        
+        # Add placeholder text
+        canvas_obj.setFillColor(HexColor('#FFFFFF'))
+        canvas_obj.setFont("Helvetica", 16)
+        text = "Picture placeholder"
+        text_width = canvas_obj.stringWidth(text, "Helvetica", 16)
+        canvas_obj.drawString(
+            x + (width - text_width) / 2,
+            y + (height / 2) - 8,
+            text
+        )
     async def convert_image_to_pdf(
         self, 
         image_data: bytes,

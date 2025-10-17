@@ -52,7 +52,8 @@ class TestValidators:
         request_data = {
             'customer_name': '  Test Company  ',
             'industry': '  Construction  ',
-            'logo': 'base64data',
+            'logo_dark': 'base64data',
+            'logo_light': 'base64data',
             'items': ['  Sweatshirt  ', '  T-Shirt  '],
             'colors': ['  Red  ', '  Blue  ']
         }

@@ -48,8 +48,9 @@ def sample_catalog_request() -> Dict[str, Any]:
     return {
         'customer_name': 'Test Company',
         'industry': 'Construction',
-        # 1x1 transparent PNG in base64
-        'logo': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        # 1x1 transparent PNG in base64 for both logos
+        'logo_dark': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'logo_light': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
         'items': ['Sweatshirt', 'T-Shirt'],
         'colors': ['Red', 'Blue']
     }
@@ -63,6 +64,7 @@ def sample_template() -> Dict[str, Any]:
         'item_name': 'Sweatshirt',
         'color': 'Red',
         'template_url': 'https://example.com/template.png',
+        'background': 'light',
         'logo_position_x': 150,
         'logo_position_y': 200,
         'logo_size': 'large',
@@ -125,8 +127,10 @@ def mock_n8n_logo_response(sample_job_id: str) -> N8NLogoProcessingResponse:
     """Mock successful logo processing response from n8n"""
     return N8NLogoProcessingResponse(
         job_id=sample_job_id,
-        logo_large_url='https://example.com/logos/large.png',
-        logo_small_url='https://example.com/logos/small.png',
+        logo_dark_large_url='https://example.com/logos/dark_large.png',
+        logo_dark_small_url='https://example.com/logos/dark_small.png',
+        logo_light_large_url='https://example.com/logos/light_large.png',
+        logo_light_small_url='https://example.com/logos/light_small.png',
         success=True
     )
 

@@ -12,8 +12,7 @@ class TestPDFService:
         service = PDFService()
         
         pdf_bytes = await service.generate_front_page(
-            customer_name="Test Company",
-            industry="Testing"
+            customer_name="Test Company"
         )
         
         # Verify it's a valid PDF
@@ -42,8 +41,8 @@ class TestPDFService:
         service = PDFService()
         
         # Create 2 test PDFs
-        pdf1 = await service.generate_front_page("Company 1", "Industry 1")
-        pdf2 = await service.generate_front_page("Company 2", "Industry 2")
+        pdf1 = await service.generate_front_page("Company 1")
+        pdf2 = await service.generate_front_page("Company 2")
         
         # Merge
         merged = await service.merge_pdfs([pdf1, pdf2])

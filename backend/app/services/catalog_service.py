@@ -46,8 +46,8 @@ class CatalogService:
             }
             await self.db.create_job(job_data)
             
-            # 2. Upload logo to Supabase Storage
-            logo_url = await self._upload_logo(job_id, request.logo)
+            # 2. Upload both logos to Supabase Storage
+            logo_dark_url, logo_light_url = await self._upload_logos(job_id, request.logo_dark, request.logo_light)
             
             # 3. Update job status to processing
             await self.db.update_job_status(
@@ -60,7 +60,8 @@ class CatalogService:
             await self._process_catalog_generation(
                 job_id, 
                 request, 
-                logo_url
+                logo_dark_url,
+                logo_light_url
             )
             
             return {
@@ -81,28 +82,43 @@ class CatalogService:
             )
             raise
     
-    async def _upload_logo(self, job_id: str, logo_data: str) -> str:
-        """Upload logo to Supabase Storage"""
+    async def _upload_logos(self, job_id: str, logo_dark_data: str, logo_light_data: str) -> tuple[str, str]:
+        """Upload both logos to Supabase Storage with background-specific naming"""
         try:
-            # Decode base64 logo
-            if ',' in logo_data:
-                logo_data = logo_data.split(',')[1]
+            # Process dark logo
+            if ',' in logo_dark_data:
+                logo_dark_data = logo_dark_data.split(',')[1]
+            logo_dark_bytes = base64.b64decode(logo_dark_data)
             
-            logo_bytes = base64.b64decode(logo_data)
+            # Process light logo
+            if ',' in logo_light_data:
+                logo_light_data = logo_light_data.split(',')[1]
+            logo_light_bytes = base64.b64decode(logo_light_data)
             
-            # Upload to Supabase Storage
-            file_path = f"logos/{job_id}/original.png"
-            logo_url = await self.storage.upload_file(
-                file_path,
-                logo_bytes,
+            # Upload both logos with descriptive names
+            dark_file_path = f"logos/{job_id}/logo_fundo_escuro.png"
+            light_file_path = f"logos/{job_id}/logo_fundo_claro.png"
+            
+            logo_dark_url = await self.storage.upload_file(
+                dark_file_path,
+                logo_dark_bytes,
                 content_type='image/png'
             )
             
-            logger.info(f"Logo uploaded for job {job_id}: {logo_url}")
-            return logo_url
+            logo_light_url = await self.storage.upload_file(
+                light_file_path,
+                logo_light_bytes,
+                content_type='image/png'
+            )
+            
+            logger.info(f"Logos uploaded for job {job_id}:")
+            logger.info(f"  Dark background logo: {logo_dark_url}")
+            logger.info(f"  Light background logo: {logo_light_url}")
+            
+            return logo_dark_url, logo_light_url
             
         except Exception as e:
-            logger.error(f"Error uploading logo: {e}")
+            logger.error(f"Error uploading logos: {e}")
             raise LogoProcessingException(detail=str(e))
     
     async def _validate_templates(self, items: List[str], colors: List[str]):
@@ -125,16 +141,18 @@ class CatalogService:
         self, 
         job_id: str, 
         request: CatalogRequest,
-        logo_url: str
+        logo_dark_url: str,
+        logo_light_url: str
     ):
         """Process the entire catalog generation workflow"""
         try:
-            # Step 1: Process logo (remove background, resize)
-            logger.info(f"[Job {job_id}] Step 1: Processing logo...")
+            # Step 1: Process logos (remove background, resize)
+            logger.info(f"[Job {job_id}] Step 1: Processing both logos...")
             logo_response = await self.n8n.process_logo(
                 N8NLogoProcessingPayload(
                     job_id=job_id,
-                    logo_url=logo_url
+                    logo_dark_url=logo_dark_url,
+                    logo_light_url=logo_light_url
                 )
             )
             
@@ -157,13 +175,30 @@ class CatalogService:
             
             for item in request.items:
                 for color in request.colors:
+                    # Get template to determine background
+                    template = await self.db.get_template(item, color)
+                    if not template:
+                        logger.warning(f"Template not found for {item} - {color}, skipping")
+                        continue
+                    
+                    background = template.get('background', 'light')  # Default to light
+                    
+                    # Choose appropriate logo URLs based on background
+                    if background == 'dark':
+                        logo_large_url = logo_response.logo_light_large_url
+                        logo_small_url = logo_response.logo_light_small_url
+                    else:  # light background
+                        logo_large_url = logo_response.logo_dark_large_url
+                        logo_small_url = logo_response.logo_dark_small_url
+                    
                     page_response = await self.n8n.generate_page(
                         N8NPageGeneratorPayload(
                             job_id=job_id,
                             item=item,
                             color=color,
-                            logo_large_url=logo_response.logo_large_url,
-                            logo_small_url=logo_response.logo_small_url
+                            logo_large_url=logo_large_url,
+                            logo_small_url=logo_small_url,
+                            background=background
                         )
                     )
                     

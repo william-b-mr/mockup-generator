@@ -73,50 +73,56 @@ class TestCatalogService:
     @patch('app.services.catalog_service.DatabaseService')
     @patch('app.services.catalog_service.StorageService')
     @patch('app.services.catalog_service.N8NService')
-    async def test_upload_logo_success(
+    async def test_upload_logos_success(
         self, 
         mock_n8n, 
         mock_storage, 
         mock_db
     ):
-        """Test logo upload succeeds with valid base64 data"""
+        """Test dual logos upload succeeds with valid base64 data"""
         # Setup
         service = CatalogService()
         service.storage = AsyncMock()
-        service.storage.upload_file.return_value = 'https://example.com/logo.png'
+        service.storage.upload_file.side_effect = [
+            'https://example.com/logo_dark.png',
+            'https://example.com/logo_light.png'
+        ]
         
         job_id = 'test-job-id'
         # Valid 1x1 PNG in base64
         logo_data = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
         
         # Execute
-        logo_url = await service._upload_logo(job_id, logo_data)
+        logo_dark_url, logo_light_url = await service._upload_logos(job_id, logo_data, logo_data)
         
         # Verify
-        assert logo_url == 'https://example.com/logo.png'
-        service.storage.upload_file.assert_called_once()
+        assert logo_dark_url == 'https://example.com/logo_dark.png'
+        assert logo_light_url == 'https://example.com/logo_light.png'
+        assert service.storage.upload_file.call_count == 2
         
-        # Check file path
-        call_args = service.storage.upload_file.call_args
-        assert call_args[0][0] == f'logos/{job_id}/original.png'
+        # Check file paths
+        call_args = service.storage.upload_file.call_args_list
+        assert call_args[0][0][0] == f'logos/{job_id}/logo_fundo_escuro.png'
+        assert call_args[1][0][0] == f'logos/{job_id}/logo_fundo_claro.png'
     
     @patch('app.services.catalog_service.DatabaseService')
     @patch('app.services.catalog_service.StorageService')
     @patch('app.services.catalog_service.N8NService')
-    async def test_upload_logo_invalid_base64(
+    async def test_upload_logos_invalid_base64(
         self, 
         mock_n8n, 
         mock_storage, 
         mock_db
     ):
-        """Test logo upload fails with invalid base64 data"""
+        """Test dual logos upload fails with invalid base64 data"""
         # Setup
         service = CatalogService()
         service.storage = AsyncMock()
         
         job_id = 'test-job-id'
         invalid_logo = 'not-valid-base64!!!'
+        valid_logo = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
         
         # Execute & Assert
         with pytest.raises(LogoProcessingException):
-            await service._upload_logo(job_id, invalid_logo)
+            await service._upload_logos(job_id, invalid_logo, valid_logo)
