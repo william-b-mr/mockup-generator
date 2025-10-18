@@ -229,9 +229,17 @@ class CatalogService:
                             job_id=job_id
                         )
 
-            # Upload PDF
+            # Upload PDF with formatted filename
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            # Sanitize customer name for filename (replace spaces and special chars)
+            safe_customer_name = "".join(
+                c if c.isalnum() or c in ('-', '_') else '_'
+                for c in request.customer_name
+            )
+            pdf_filename = f"{safe_customer_name}_catalogo_{current_date}.pdf"
+
             pdf_url = await self.storage.upload_file(
-                f"catalogs/{job_id}.pdf",
+                f"catalogs/{pdf_filename}",
                 pdf_bytes,
                 content_type='application/pdf'
             )
