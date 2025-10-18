@@ -46,7 +46,7 @@ class PDFService:
             
             # 1. RED HEADER SECTION
             # Draw red header rectangle (reduced to ~15% of page height)
-            header_height = height * 0.10
+            header_height = height * 0.11
             c.setFillColor(self.mbc_red)
             c.rect(0, height - header_height, width, header_height, stroke=0, fill=1)
             
@@ -61,12 +61,12 @@ class PDFService:
                 if logo:
                     logo_reader = ImageReader(logo)
                     # Better positioning and sizing for professional look
-                    logo_width = 250  # Increased size for better visibility
-                    logo_height = 75   # Proportional height
+                    logo_width = 300  # Increased size for better visibility
+                    logo_height = 90   # Proportional height
                     logo_y = height - header_height + (header_height - logo_height) / 2
                     c.drawImage(
                         logo_reader,
-                        5,  # More to the left
+                        5,
                         logo_y,
                         width=logo_width,
                         height=logo_height,
