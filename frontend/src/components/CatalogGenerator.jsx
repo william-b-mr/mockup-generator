@@ -16,11 +16,11 @@ export default function CatalogGenerator() {
   const [logoLightFile, setLogoLightFile] = useState(null);
   const [logoDarkPreview, setLogoDarkPreview] = useState('');
   const [logoLightPreview, setLogoLightPreview] = useState('');
+  const [frontLogoPosition, setFrontLogoPosition] = useState('peito_esquerdo');
   
-  const [availableItems, setAvailableItems] = useState([]);
-  const [availableColors, setAvailableColors] = useState([]);
-  const [selectedItems, setSelectedItems] = useState([]);
-  const [selectedColors, setSelectedColors] = useState([]);
+  const [availableTemplates, setAvailableTemplates] = useState([]); // [{item_name, colors: []}]
+  const [selectedPairs, setSelectedPairs] = useState([]); // [{item, color}]
+  const [expandedItem, setExpandedItem] = useState(null); // Which item's color picker is open
   
   const [loading, setLoading] = useState(false);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
@@ -35,13 +35,8 @@ export default function CatalogGenerator() {
   const fetchTemplates = async () => {
     try {
       setLoadingTemplates(true);
-      const templates = await api.fetchTemplates();
-      
-      const items = getUniqueValues(templates, 'item_name');
-      const colors = getUniqueValues(templates, 'color');
-      
-      setAvailableItems(items);
-      setAvailableColors(colors);
+      const groupedTemplates = await api.fetchGroupedTemplates();
+      setAvailableTemplates(groupedTemplates);
     } catch (err) {
       setError('Erro ao carregar itens disponíveis');
     } finally {
@@ -79,16 +74,32 @@ export default function CatalogGenerator() {
     reader.readAsDataURL(file);
   };
 
-  const toggleItem = (item) => {
-    setSelectedItems(prev =>
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-    );
+  const toggleItemExpanded = (itemName) => {
+    setExpandedItem(prev => prev === itemName ? null : itemName);
   };
 
-  const toggleColor = (color) => {
-    setSelectedColors(prev =>
-      prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]
-    );
+  const toggleColorForItem = (itemName, color) => {
+    const pairKey = `${itemName}|${color}`;
+    const exists = selectedPairs.some(p => `${p.item}|${p.color}` === pairKey);
+
+    if (exists) {
+      // Remove this pair
+      setSelectedPairs(prev => prev.filter(p => `${p.item}|${p.color}` !== pairKey));
+    } else {
+      // Add this pair
+      setSelectedPairs(prev => [...prev, { item: itemName, color }]);
+    }
+  };
+
+  const getSelectedColorsForItem = (itemName) => {
+    return selectedPairs
+      .filter(p => p.item === itemName)
+      .map(p => p.color);
+  };
+
+  const removeAllColorsForItem = (itemName) => {
+    setSelectedPairs(prev => prev.filter(p => p.item !== itemName));
+    setExpandedItem(null);
   };
 
   const pollJobStatus = async (jobId) => {
@@ -136,8 +147,8 @@ export default function CatalogGenerator() {
       setError('Por favor, carregue ambos os logótipos (fundo escuro e claro)');
       return;
     }
-    if (catalogType === 'custom' && (selectedItems.length === 0 || selectedColors.length === 0)) {
-      setError('Por favor, selecione pelo menos um item e uma cor');
+    if (catalogType === 'custom' && selectedPairs.length === 0) {
+      setError('Por favor, selecione pelo menos uma combinação de artigo e cor');
       return;
     }
 
@@ -146,14 +157,20 @@ export default function CatalogGenerator() {
     try {
       const base64LogoDark = await fileToBase64(logoDarkFile);
       const base64LogoLight = await fileToBase64(logoLightFile);
-      
-      let items, colors;
+
+      let selections;
       if (catalogType === 'custom') {
-        items = selectedItems;
-        colors = selectedColors;
+        selections = selectedPairs;
       } else {
-        items = availableItems.slice(0, 3);
-        colors = availableColors.slice(0, 2);
+        // For industry/pack, create default selections from first 3 items with their first 2 colors
+        selections = [];
+        const templatesToUse = availableTemplates.slice(0, 3);
+        for (const template of templatesToUse) {
+          const colorsToUse = template.colors.slice(0, 2);
+          for (const color of colorsToUse) {
+            selections.push({ item: template.item_name, color });
+          }
+        }
       }
 
       const payload = {
@@ -161,8 +178,8 @@ export default function CatalogGenerator() {
         industry: industry,
         logo_dark: base64LogoDark,
         logo_light: base64LogoLight,
-        items: items,
-        colors: colors
+        front_logo_position: frontLogoPosition,
+        selections: selections
       };
 
       const data = await api.generateCatalog(payload);
@@ -286,6 +303,22 @@ export default function CatalogGenerator() {
             </div>
           </div>
 
+          {/* Front Logo Position */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Posição do Logo Frontal *
+            </label>
+            <select
+              value={frontLogoPosition}
+              onChange={(e) => setFrontLogoPosition(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-mbc-red focus:border-transparent"
+              disabled={loading}
+            >
+              <option value="peito_esquerdo">Peito Esquerdo</option>
+              <option value="peito_direito">Peito Direito</option>
+            </select>
+          </div>
+
           {/* Catalog Type */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -340,51 +373,85 @@ export default function CatalogGenerator() {
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Selecionar Artigos ({selectedItems.length})
+                      Selecionar Artigos e Cores ({selectedPairs.length} combinações)
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {availableItems.map(item => (
-                        <button
-                          key={item}
-                          onClick={() => toggleItem(item)}
-                          className={`px-3 py-2 rounded-lg border transition text-sm ${
-                            selectedItems.includes(item)
-                              ? 'border-mbc-red bg-red-50 text-mbc-red font-medium'
-                              : 'border-gray-300 hover:border-mbc-red'
-                          }`}
-                          disabled={loading}
-                        >
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Clique num artigo para ver as suas cores disponíveis
+                    </p>
+                    <div className="space-y-3">
+                      {availableTemplates.map(template => {
+                        const selectedColors = getSelectedColorsForItem(template.item_name);
+                        const isExpanded = expandedItem === template.item_name;
+                        const hasSelections = selectedColors.length > 0;
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Selecionar Cores ({selectedColors.length})
-                    </label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {availableColors.map(color => (
-                        <button
-                          key={color}
-                          onClick={() => toggleColor(color)}
-                          className={`px-3 py-2 rounded-lg border transition text-sm ${
-                            selectedColors.includes(color)
-                              ? 'border-mbc-red bg-red-50 text-mbc-red font-medium'
-                              : 'border-gray-300 hover:border-mbc-red'
-                          }`}
-                          disabled={loading}
-                        >
-                          {color}
-                        </button>
-                      ))}
+                        return (
+                          <div key={template.item_name} className="border rounded-lg overflow-hidden">
+                            {/* Article Header */}
+                            <div
+                              className={`flex items-center justify-between p-3 cursor-pointer transition ${
+                                hasSelections
+                                  ? 'bg-red-50 border-b border-red-200'
+                                  : 'bg-gray-50 hover:bg-gray-100'
+                              }`}
+                              onClick={() => toggleItemExpanded(template.item_name)}
+                            >
+                              <div className="flex items-center space-x-3">
+                                <span className="font-medium text-gray-900">{template.item_name}</span>
+                                {hasSelections && (
+                                  <span className="px-2 py-1 bg-mbc-red text-white text-xs rounded-full">
+                                    {selectedColors.length} cor{selectedColors.length !== 1 ? 'es' : ''}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                {hasSelections && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeAllColorsForItem(template.item_name);
+                                    }}
+                                    className="text-xs text-red-600 hover:text-red-800 px-2 py-1 hover:bg-red-100 rounded"
+                                    disabled={loading}
+                                  >
+                                    Limpar
+                                  </button>
+                                )}
+                                <span className="text-gray-500">
+                                  {isExpanded ? '▼' : '▶'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Color Selection */}
+                            {isExpanded && (
+                              <div className="p-3 bg-white">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                  {template.colors.map(color => (
+                                    <button
+                                      key={color}
+                                      onClick={() => toggleColorForItem(template.item_name, color)}
+                                      className={`px-3 py-2 rounded-lg border transition text-sm ${
+                                        selectedColors.includes(color)
+                                          ? 'border-mbc-red bg-red-50 text-mbc-red font-medium'
+                                          : 'border-gray-300 hover:border-mbc-red'
+                                      }`}
+                                      disabled={loading}
+                                    >
+                                      {color}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                     <p className="text-sm text-blue-800">
-                      ℹ️ Total de páginas: <strong>{selectedItems.length * selectedColors.length + 1}</strong> (1 capa + {selectedItems.length * selectedColors.length} páginas)
+                      ℹ️ Total de páginas: <strong>{selectedPairs.length + 1}</strong> (1 capa + {selectedPairs.length} páginas)
                     </p>
                   </div>
                 </>

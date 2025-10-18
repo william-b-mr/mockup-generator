@@ -10,6 +10,15 @@ export const api = {
     return response.json();
   },
 
+  // Fetch templates grouped by article with available colors
+  async fetchGroupedTemplates() {
+    const response = await fetch(`${API_URL}/templates/grouped`);
+    if (!response.ok) {
+      throw new Error('Erro ao carregar templates');
+    }
+    return response.json();
+  },
+
   // Generate catalog
   async generateCatalog(payload) {
     const response = await fetch(`${API_URL}/catalog/generate`, {

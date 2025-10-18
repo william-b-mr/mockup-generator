@@ -9,23 +9,32 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class ArticleColorSelection(BaseModel):
+    """Represents a specific article-color combination selected by the user"""
+    item: str = Field(..., min_length=1, max_length=100)
+    color: str = Field(..., min_length=1, max_length=100)
+
+    @field_validator('item', 'color')
+    @classmethod
+    def strip_whitespace(cls, v):
+        return v.strip()
+
+class LogoPosition(str, Enum):
+    PEITO_ESQUERDO = "peito_esquerdo"
+    PEITO_DIREITO = "peito_direito"
+
 class CatalogRequest(BaseModel):
     customer_name: str = Field(..., min_length=1, max_length=200)
     industry: str = Field(..., min_length=1, max_length=100)
     logo_dark: str = Field(..., description="Base64 encoded logo for dark backgrounds")
     logo_light: str = Field(..., description="Base64 encoded logo for light backgrounds")
-    items: List[str] = Field(..., min_length=1, max_length=50)
-    colors: List[str] = Field(..., min_length=1, max_length=20)
-    
+    front_logo_position: LogoPosition = Field(..., description="Position for the front logo: peito_esquerdo or peito_direito")
+    selections: List[ArticleColorSelection] = Field(..., min_length=1, max_length=100, description="List of article-color pairs to generate")
+
     @field_validator('customer_name', 'industry')
     @classmethod
     def strip_whitespace(cls, v):
         return v.strip()
-    
-    @field_validator('items', 'colors')
-    @classmethod
-    def validate_lists(cls, v):
-        return [item.strip() for item in v if item.strip()]
 
 class CatalogResponse(BaseModel):
     job_id: str
@@ -79,6 +88,7 @@ class N8NPageGeneratorPayload(BaseModel):
     logo_large_url: str
     logo_small_url: str
     background: str  # "light" or "dark" - determines which logo to use
+    front_logo_position: str  # "peito_esquerdo" or "peito_direito"
 
 class N8NPageGeneratorResponse(BaseModel):
     job_id: str

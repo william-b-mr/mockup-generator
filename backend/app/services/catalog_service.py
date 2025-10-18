@@ -39,9 +39,8 @@ class CatalogService:
                 'industry': request.industry,
                 'status': JobStatus.PENDING.value,
                 'metadata': {
-                    'items': request.items,
-                    'colors': request.colors,
-                    'total_pages': len(request.items) * len(request.colors)
+                    'selections': [{'item': s.item, 'color': s.color} for s in request.selections],
+                    'total_pages': len(request.selections)
                 }
             }
             await self.db.create_job(job_data)
@@ -69,7 +68,7 @@ class CatalogService:
                 'status': JobStatus.PROCESSING.value,
                 'message': 'Catalog generation started',
                 'estimated_time_seconds': self._estimate_processing_time(
-                    len(request.items) * len(request.colors)
+                    len(request.selections)
                 )
             }
             
@@ -121,16 +120,15 @@ class CatalogService:
             logger.error(f"Error uploading logos: {e}")
             raise LogoProcessingException(detail=str(e))
     
-    async def _validate_templates(self, items: List[str], colors: List[str]):
+    async def _validate_templates(self, selections: List[tuple[str, str]]):
         """Validate that all required templates exist"""
         missing_templates = []
-        
-        for item in items:
-            for color in colors:
-                template = await self.db.get_template(item, color)
-                if not template:
-                    missing_templates.append(f"{item} - {color}")
-        
+
+        for item, color in selections:
+            template = await self.db.get_template(item, color)
+            if not template:
+                missing_templates.append(f"{item} - {color}")
+
         if missing_templates:
             raise TemplateNotFoundException(
                 item=missing_templates[0].split(' - ')[0],
@@ -162,61 +160,65 @@ class CatalogService:
                 )
             
             await self.db.update_job_status(job_id, JobStatus.PROCESSING.value, progress=30)
-            
+
             # Step 2: Validate templates exist
             logger.info(f"[Job {job_id}] Step 2: Validating templates...")
-            await self._validate_templates(request.items, request.colors)
-            
+            selections_list = [(s.item, s.color) for s in request.selections]
+            await self._validate_templates(selections_list)
+
             # Step 3: Generate pages
             logger.info(f"[Job {job_id}] Step 3: Generating pages...")
             page_urls = []
-            total_pages = len(request.items) * len(request.colors)
+            total_pages = len(request.selections)
             processed_pages = 0
-            
-            for item in request.items:
-                for color in request.colors:
-                    # Get template to determine background
-                    template = await self.db.get_template(item, color)
-                    if not template:
-                        logger.warning(f"Template not found for {item} - {color}, skipping")
-                        continue
-                    
-                    background = template.get('background', 'light')  # Default to light
-                    
-                    # Choose appropriate logo URLs based on background
-                    if background == 'dark':
-                        logo_large_url = logo_response.logo_light_large_url
-                        logo_small_url = logo_response.logo_light_small_url
-                    else:  # light background
-                        logo_large_url = logo_response.logo_dark_large_url
-                        logo_small_url = logo_response.logo_dark_small_url
-                    
-                    page_response = await self.n8n.generate_page(
-                        N8NPageGeneratorPayload(
-                            job_id=job_id,
-                            item=item,
-                            color=color,
-                            logo_large_url=logo_large_url,
-                            logo_small_url=logo_small_url,
-                            background=background
-                        )
+
+            for selection in request.selections:
+                item = selection.item
+                color = selection.color
+
+                # Get template to determine background
+                template = await self.db.get_template(item, color)
+                if not template:
+                    logger.warning(f"Template not found for {item} - {color}, skipping")
+                    continue
+
+                background = template.get('background', 'light')  # Default to light
+
+                # Choose appropriate logo URLs based on background
+                if background == 'dark':
+                    logo_large_url = logo_response.logo_light_large_url
+                    logo_small_url = logo_response.logo_light_small_url
+                else:  # light background
+                    logo_large_url = logo_response.logo_dark_large_url
+                    logo_small_url = logo_response.logo_dark_small_url
+
+                page_response = await self.n8n.generate_page(
+                    N8NPageGeneratorPayload(
+                        job_id=job_id,
+                        item=item,
+                        color=color,
+                        logo_large_url=logo_large_url,
+                        logo_small_url=logo_small_url,
+                        background=background,
+                        front_logo_position=request.front_logo_position.value
                     )
-                    
-                    if page_response.success:
-                        page_urls.append(page_response.page_url)
-                        processed_pages += 1
-                        
-                        # Update progress
-                        progress = 30 + int((processed_pages / total_pages) * 50)
-                        await self.db.update_job_status(
-                            job_id, 
-                            JobStatus.PROCESSING.value,
-                            progress=progress
-                        )
-                    else:
-                        logger.warning(
-                            f"Failed to generate page for {item} - {color}"
-                        )
+                )
+
+                if page_response.success:
+                    page_urls.append(page_response.page_url)
+                    processed_pages += 1
+
+                    # Update progress
+                    progress = 30 + int((processed_pages / total_pages) * 50)
+                    await self.db.update_job_status(
+                        job_id,
+                        JobStatus.PROCESSING.value,
+                        progress=progress
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to generate page for {item} - {color}"
+                    )
             
             # Step 4: Assemble PDF
             logger.info(f"[Job {job_id}] Step 4: Assembling PDF...")
