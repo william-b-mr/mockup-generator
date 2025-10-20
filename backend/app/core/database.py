@@ -24,7 +24,7 @@ class Database:
                 max_size=20,
                 timeout=30,
                 command_timeout=60,
-                ssl="Require"  # Adjust SSL mode as needed
+                ssl="require"  # Adjust SSL mode as needed
             )
             logger.info("Database connection pool created successfully")
         except Exception as e:
