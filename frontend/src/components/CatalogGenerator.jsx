@@ -1,4 +1,3 @@
-// (Use the component from the previous artifact)
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../services/api';

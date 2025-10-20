@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 class DatabaseService:
     """Handle all database operations using direct PostgreSQL connection"""
-    
+
     @staticmethod
     def _serialize_json(data: Any) -> str:
         """Convert Python object to JSON string for PostgreSQL JSONB"""
         if isinstance(data, str):
             return data
         return json.dumps(data)
-    
+
     @staticmethod
     def _deserialize_json(data: Any) -> Any:
         """Convert JSON string/dict from database to Python object"""
@@ -27,9 +27,7 @@ class DatabaseService:
                 return json.loads(data)
             except json.JSONDecodeError:
                 return data
-        return data  # Already a dict (asyncpg might return it as dict)
-    
-    # ===== TEMPLATE OPERATIONS =====
+        return data
     
     async def get_template(self, item_name: str, color: str) -> Optional[Dict[str, Any]]:
         """Get template for specific item and color"""
@@ -132,9 +130,8 @@ class DatabaseService:
     async def create_job(self, job_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new catalog generation job"""
         try:
-            # FIXED: Convert metadata dict to JSON string for JSONB column
             metadata_json = self._serialize_json(job_data.get('metadata', {}))
-            
+
             query = """
                 INSERT INTO jobs (
                     id, customer_name, industry, status,
@@ -152,16 +149,15 @@ class DatabaseService:
                 job_data['industry'],
                 job_data['status'],
                 job_data.get('progress', 0),
-                metadata_json  # FIXED: Pass as JSON string with ::jsonb cast
+                metadata_json
             )
-            
+
             if row:
                 result = dict(row)
-                # Convert metadata back to dict for response
                 result['metadata'] = self._deserialize_json(result.get('metadata'))
                 return result
             return None
-            
+
         except Exception as e:
             logger.error(f"Error creating job: {e}")
             raise
@@ -177,12 +173,10 @@ class DatabaseService:
                 WHERE id = $1
             """
             row = await db.fetch_one(query, job_id)
-            
+
             if row:
                 result = dict(row)
-                # Convert 'id' to 'job_id' to match API schema and ensure it's a string
                 result['job_id'] = str(result.pop('id'))
-                # FIXED: Convert metadata back to dict for response
                 result['metadata'] = self._deserialize_json(result.get('metadata'))
                 return result
             return None
@@ -191,35 +185,34 @@ class DatabaseService:
             return None
     
     async def update_job_status(
-        self, 
-        job_id: str, 
+        self,
+        job_id: str,
         status: str,
         pdf_url: Optional[str] = None,
         error_message: Optional[str] = None,
         progress: Optional[int] = None
-    ) -> Optional[Dict[str, Any]]:  # FIXED: Return Optional instead of Dict
+    ) -> Optional[Dict[str, Any]]:
         """Update job status"""
         try:
-            # Build dynamic query based on provided parameters
             updates = ["status = $2", "updated_at = NOW()"]
             params = [job_id, status]
             param_count = 3
-            
+
             if pdf_url is not None:
                 updates.append(f"pdf_url = ${param_count}")
                 params.append(pdf_url)
                 param_count += 1
-            
+
             if error_message is not None:
                 updates.append(f"error_message = ${param_count}")
                 params.append(error_message)
                 param_count += 1
-            
+
             if progress is not None:
                 updates.append(f"progress = ${param_count}")
                 params.append(progress)
                 param_count += 1
-            
+
             query = f"""
                 UPDATE jobs
                 SET {', '.join(updates)}
@@ -228,31 +221,27 @@ class DatabaseService:
                           progress, pdf_url, error_message, metadata,
                           created_at, updated_at
             """
-            
+
             row = await db.fetch_one(query, *params)
-            
+
             if row:
                 result = dict(row)
-                # Convert 'id' to 'job_id' to match API schema and ensure it's a string
                 result['job_id'] = str(result.pop('id'))
-                # FIXED: Convert metadata back to dict for response
                 result['metadata'] = self._deserialize_json(result.get('metadata'))
                 return result
-            
-            # FIXED: Return None if job not found instead of raising error
+
             logger.warning(f"Job {job_id} not found for status update")
             return None
-            
+
         except Exception as e:
             logger.error(f"Error updating job status: {e}")
             raise
 
 
 class StorageService:
-    """Handle all Supabase Storage operations - FIXED VERSION"""
-    
+    """Handle all Supabase Storage operations"""
+
     def __init__(self):
-        # Use full Supabase client for proper storage access
         self.client: Client = create_client(
             settings.SUPABASE_URL,
             settings.SUPABASE_SERVICE_KEY
@@ -261,48 +250,34 @@ class StorageService:
         logger.info(f"Storage client initialized for bucket: {self.bucket_name}")
     
     async def upload_file(
-        self, 
-        file_path: str, 
-        file_content: bytes, 
+        self,
+        file_path: str,
+        file_content: bytes,
         content_type: str = 'application/octet-stream'
     ) -> str:
         """Upload file to Supabase Storage"""
         try:
-            # Remove leading slashes
             file_path = file_path.lstrip('/')
-            
-            logger.info(f"Uploading file:")
-            logger.info(f"  Bucket: {self.bucket_name}")
-            logger.info(f"  Path: {file_path}")
-            logger.info(f"  Size: {len(file_content)} bytes")
-            logger.info(f"  Type: {content_type}")
-            
-            # Upload using Supabase client
+
+            logger.info(f"Uploading file: {file_path} ({len(file_content)} bytes)")
+
             res = self.client.storage.from_(self.bucket_name).upload(
                 path=file_path,
                 file=file_content,
                 file_options={
                     "content-type": content_type,
-                    "upsert": "true"  # Overwrite if exists
+                    "upsert": "true"
                 }
             )
-            
-            logger.info(f"Upload response: {res}")
-            
-            # Get public URL
+
             public_url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
-            
-            logger.info(f"✓ Upload successful: {public_url}")
+
+            logger.info(f"Upload successful: {public_url}")
             return public_url
-            
+
         except Exception as e:
-            logger.error(f"✗ Upload failed:")
-            logger.error(f"  Error: {e}")
-            logger.error(f"  Error type: {type(e)}")
-            logger.error(f"  Path: {file_path}")
-            logger.error(f"  Bucket: {self.bucket_name}")
-            
-            # Better error messages
+            logger.error(f"Upload failed: {e}")
+
             error_str = str(e)
             if "Bucket not found" in error_str or "404" in error_str:
                 raise Exception(
@@ -310,7 +285,6 @@ class StorageService:
                     f"Create it in Supabase Dashboard → Storage → New Bucket"
                 )
             elif "already exists" in error_str.lower():
-                # File exists, try to get its URL
                 public_url = self.client.storage.from_(self.bucket_name).get_public_url(file_path)
                 logger.info(f"File already exists, returning existing URL: {public_url}")
                 return public_url

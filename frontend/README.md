@@ -15,10 +15,11 @@ Frontend para o sistema de geração automática de catálogos personalizados.
 # Instalar dependências
 npm install
 
-# Copiar configuração
-cp .env.example .env
+# Copiar configuração para desenvolvimento
+cp .env.example .env.development
 
-# Editar .env com URL da API
+# Editar .env.development com URL da API
+# (Para produção, usar .env.production)
 ```
 
 ## Desenvolvimento

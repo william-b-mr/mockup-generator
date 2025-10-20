@@ -6,6 +6,8 @@ from app.models.schemas import (
     N8NLogoProcessingResponse,
     N8NPageGeneratorPayload,
     N8NPageGeneratorResponse,
+    N8NFrontPageImagePayload,
+    N8NFrontPageImageResponse,
 )
 import logging
 from typing import Dict, Any
@@ -66,7 +68,7 @@ class N8NService:
         return N8NLogoProcessingResponse(**response)
     
     async def generate_page(
-        self, 
+        self,
         payload: N8NPageGeneratorPayload
     ) -> N8NPageGeneratorResponse:
         """Call page generator workflow"""
@@ -74,12 +76,30 @@ class N8NService:
             f"Generating page for job {payload.job_id}: "
             f"{payload.item} - {payload.color} (background: {payload.background})"
         )
-        
+
         response = await self._call_webhook(
             webhook_id=settings.N8N_PAGE_GENERATOR_WEBHOOK,
             payload=payload.model_dump(),
             workflow_name="page_generator"
         )
-        
+
         return N8NPageGeneratorResponse(**response)
+
+    async def generate_front_page_image(
+        self,
+        payload: N8NFrontPageImagePayload
+    ) -> N8NFrontPageImageResponse:
+        """Call front page image generation workflow"""
+        logger.info(
+            f"Generating front page image for job {payload.job_id}: "
+            f"industry={payload.industry}"
+        )
+
+        response = await self._call_webhook(
+            webhook_id=settings.N8N_FRONT_PAGE_IMAGE_WEBHOOK,
+            payload=payload.model_dump(),
+            workflow_name="front_page_image_generator"
+        )
+
+        return N8NFrontPageImageResponse(**response)
     

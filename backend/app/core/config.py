@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     N8N_WEBHOOK_BASE_URL: str
     N8N_LOGO_PROCESSING_WEBHOOK: str
     N8N_PAGE_GENERATOR_WEBHOOK: str
+    N8N_FRONT_PAGE_IMAGE_WEBHOOK: str
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"

@@ -12,6 +12,7 @@ from app.models.schemas import (
     JobStatus,
     N8NLogoProcessingPayload,
     N8NPageGeneratorPayload,
+    N8NFrontPageImagePayload,
 )
 from app.core.exceptions import (
     TemplateNotFoundException,
@@ -82,19 +83,16 @@ class CatalogService:
             raise
     
     async def _upload_logos(self, job_id: str, logo_dark_data: str, logo_light_data: str) -> tuple[str, str]:
-        """Upload both logos to Supabase Storage with background-specific naming"""
+        """Upload both logos to Supabase Storage"""
         try:
-            # Process dark logo
             if ',' in logo_dark_data:
                 logo_dark_data = logo_dark_data.split(',')[1]
             logo_dark_bytes = base64.b64decode(logo_dark_data)
-            
-            # Process light logo
+
             if ',' in logo_light_data:
                 logo_light_data = logo_light_data.split(',')[1]
             logo_light_bytes = base64.b64decode(logo_light_data)
-            
-            # Upload both logos with descriptive names
+
             dark_file_path = f"logos/{job_id}/logo_fundo_escuro.png"
             light_file_path = f"logos/{job_id}/logo_fundo_claro.png"
             
@@ -136,16 +134,15 @@ class CatalogService:
             )
     
     async def _process_catalog_generation(
-        self, 
-        job_id: str, 
+        self,
+        job_id: str,
         request: CatalogRequest,
         logo_dark_url: str,
         logo_light_url: str
     ):
         """Process the entire catalog generation workflow"""
         try:
-            # Step 1: Process logos (remove background, resize)
-            logger.info(f"[Job {job_id}] Step 1: Processing both logos...")
+            logger.info(f"[Job {job_id}] Step 1: Processing logos...")
             logo_response = await self.n8n.process_logo(
                 N8NLogoProcessingPayload(
                     job_id=job_id,
@@ -153,21 +150,34 @@ class CatalogService:
                     logo_light_url=logo_light_url
                 )
             )
-            
+
             if not logo_response.success:
-                raise LogoProcessingException(
-                    detail="n8n logo processing workflow failed"
+                raise LogoProcessingException(detail="Logo processing workflow failed")
+
+            await self.db.update_job_status(job_id, JobStatus.PROCESSING.value, progress=20)
+
+            logger.info(f"[Job {job_id}] Step 2: Generating front page image...")
+            front_page_image_response = await self.n8n.generate_front_page_image(
+                N8NFrontPageImagePayload(
+                    job_id=job_id,
+                    industry=request.industry
                 )
-            
+            )
+
+            front_page_image_url = None
+            if front_page_image_response.success and front_page_image_response.image_url:
+                front_page_image_url = front_page_image_response.image_url
+                logger.info(f"[Job {job_id}] Front page image ready: {front_page_image_url}")
+            else:
+                logger.warning(f"[Job {job_id}] Front page image generation failed, will use placeholder")
+
             await self.db.update_job_status(job_id, JobStatus.PROCESSING.value, progress=30)
 
-            # Step 2: Validate templates exist
-            logger.info(f"[Job {job_id}] Step 2: Validating templates...")
+            logger.info(f"[Job {job_id}] Step 3: Validating templates...")
             selections_list = [(s.item, s.color) for s in request.selections]
             await self._validate_templates(selections_list)
 
-            # Step 3: Generate pages
-            logger.info(f"[Job {job_id}] Step 3: Generating pages...")
+            logger.info(f"[Job {job_id}] Step 4: Generating pages...")
             page_urls = []
             total_pages = len(request.selections)
             processed_pages = 0
@@ -176,19 +186,17 @@ class CatalogService:
                 item = selection.item
                 color = selection.color
 
-                # Get template to determine background
                 template = await self.db.get_template(item, color)
                 if not template:
                     logger.warning(f"Template not found for {item} - {color}, skipping")
                     continue
 
-                background = template.get('background', 'light')  # Default to light
+                background = template.get('background', 'light')
 
-                # Choose appropriate logo URLs based on background
                 if background == 'dark':
                     logo_large_url = logo_response.logo_light_large_url
                     logo_small_url = logo_response.logo_light_small_url
-                else:  # light background
+                else:
                     logo_large_url = logo_response.logo_dark_large_url
                     logo_small_url = logo_response.logo_dark_small_url
 
@@ -207,8 +215,6 @@ class CatalogService:
                 if page_response.success:
                     page_urls.append(page_response.page_url)
                     processed_pages += 1
-
-                    # Update progress
                     progress = 30 + int((processed_pages / total_pages) * 50)
                     await self.db.update_job_status(
                         job_id,
@@ -216,27 +222,23 @@ class CatalogService:
                         progress=progress
                     )
                 else:
-                    logger.warning(
-                        f"Failed to generate page for {item} - {color}"
-                    )
-            
-            # Step 4: Assemble PDF
-            logger.info(f"[Job {job_id}] Step 4: Assembling PDF...")
-            pdf_bytes = await self.pdf.generate_complete_catalog(
-                            customer_name=request.customer_name,
-                            industry=request.industry,
-                            page_image_urls=page_urls,
-                            job_id=job_id
-                        )
+                    logger.warning(f"Failed to generate page for {item} - {color}")
 
-            # Upload PDF with formatted filename
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            # Sanitize customer name for filename (replace spaces and special chars)
+            logger.info(f"[Job {job_id}] Step 5: Assembling PDF...")
+            pdf_bytes = await self.pdf.generate_complete_catalog(
+                customer_name=request.customer_name,
+                industry=request.industry,
+                page_image_urls=page_urls,
+                job_id=job_id,
+                front_page_image_url=front_page_image_url
+            )
+
+            current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             safe_customer_name = "".join(
                 c if c.isalnum() or c in ('-', '_') else '_'
                 for c in request.customer_name
             )
-            pdf_filename = f"{safe_customer_name}_catalogo_{current_date}.pdf"
+            pdf_filename = f"{safe_customer_name}_catalogo_{current_datetime}.pdf"
 
             pdf_url = await self.storage.upload_file(
                 f"catalogs/{pdf_filename}",
@@ -247,7 +249,6 @@ class CatalogService:
             if not pdf_url:
                 raise Exception("PDF upload failed")
 
-            # Step 5: Update job as completed
             logger.info(f"[Job {job_id}] Completed! PDF: {pdf_url}")
             await self.db.update_job_status(
                 job_id,
@@ -267,7 +268,6 @@ class CatalogService:
     
     def _estimate_processing_time(self, total_pages: int) -> int:
         """Estimate processing time in seconds"""
-        # Rough estimate: 10 seconds per page + 30 seconds overhead
         return (total_pages * 10) + 30
     
     async def get_job_status(self, job_id: str) -> Dict[str, Any]:

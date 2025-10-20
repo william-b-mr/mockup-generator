@@ -97,5 +97,14 @@ class N8NPageGeneratorResponse(BaseModel):
     color: str
     success: bool
 
+class N8NFrontPageImagePayload(BaseModel):
+    job_id: str
+    industry: str
+
+class N8NFrontPageImageResponse(BaseModel):
+    job_id: str
+    image_url: str
+    success: bool
+
 
 

@@ -1,0 +1,31 @@
+[build]
+builder = "nixpacks"
+
+# Backend Service (FastAPI)
+[[services]]
+name = "backend"
+source = "backend"
+
+[services.env]
+PORT = "8000"
+
+[services.build]
+buildCommand = "pip install -r requirements.txt"
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+
+[services.healthcheck]
+path = "/api/health"
+timeout = 300
+interval = 30
+
+# Frontend Service (React/Vite)
+[[services]]
+name = "frontend"
+source = "frontend"
+
+[services.env]
+PORT = "3000"
+
+[services.build]
+buildCommand = "npm install && npm run build"
+startCommand = "npx vite preview --host 0.0.0.0 --port $PORT"

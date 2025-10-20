@@ -1,8 +1,15 @@
-# Environment variables
+# Environment variables (protect secrets)
 .env
-*.env
 .env.local
-.env.production
+.env.*.local
+
+# Allow these templates (they contain no secrets, just placeholders)
+!.env.example
+!.env.development
+!frontend/.env.production
+
+# Backend production env should NEVER be committed (contains secrets)
+backend/.env.production
 
 # Python
 __pycache__/
@@ -96,3 +103,13 @@ dmypy.json
 
 # Pyre
 .pyre/
+
+# Docker
+Dockerfile
+Dockerfile.*
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Scripts
+scripts/
