@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     
     # Supabase Storage (for file uploads only)
     SUPABASE_URL: str
-    SUPABASE_KEY: str
     SUPABASE_SERVICE_KEY: str
     STORAGE_BUCKET_NAME: str = "catalog-assets"
     
