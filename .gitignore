@@ -112,4 +112,4 @@ docker-compose.*.yml
 .dockerignore
 
 # Scripts
-scripts/
+backend/scripts/
